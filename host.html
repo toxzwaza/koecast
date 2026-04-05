@@ -254,7 +254,8 @@
     document.getElementById('roomInfo').textContent = `ルーム: ${roomId}`;
 
     const SAMPLE_RATE = 16000;
-    const BUFFER_SIZE = 4096;
+    const BUFFER_SIZE = 2048;
+    const MAX_PLAYBACK_DELAY = 0.3; // 再生遅延の上限（秒）
 
     let ws = null;
     let audioContext = null;
@@ -263,6 +264,8 @@
     let sourceNode = null;
     let isBroadcasting = false;
     let recognition = null;
+    let listenerSpeaking = false;
+    let silentGain = null; // processorNodeの出力を無音にするためのゲイン
 
     // 挙手者リスト
     const handRaisedNames = [];
@@ -360,7 +363,11 @@
 
       const now = playbackContext.currentTime;
       if (nextPlayTime < now) {
-        nextPlayTime = now + 0.01;
+        nextPlayTime = now + 0.005;
+      }
+      // 遅延が大きくなりすぎたらリセット
+      if (nextPlayTime - now > MAX_PLAYBACK_DELAY) {
+        nextPlayTime = now + 0.005;
       }
       source.start(nextPlayTime);
       nextPlayTime += audioBuffer.duration;
@@ -429,20 +436,25 @@
     function updateSpeakingBanner(name) {
       const banner = document.getElementById('speakingBanner');
       if (name) {
+        listenerSpeaking = true;
         document.getElementById('speakerName').textContent = name;
         banner.style.display = 'block';
         nextPlayTime = 0;
+        // 説明者の音声認識を一時停止（聴講者の声を拾わないように）
+        stopSpeechRecognition();
         // 説明者のステータスを「受信中」に変更
         if (isBroadcasting) {
           document.getElementById('indicator').className = 'indicator idle';
           document.getElementById('statusText').textContent = '受信中 - ' + name + 'が発言中';
         }
       } else {
+        listenerSpeaking = false;
         banner.style.display = 'none';
-        // 配信中なら「配信中」に戻す
+        // 配信中なら「配信中」に戻し、音声認識を再開
         if (isBroadcasting) {
           document.getElementById('indicator').className = 'indicator broadcasting';
           document.getElementById('statusText').textContent = '配信中';
+          startSpeechRecognition();
         }
       }
     }
@@ -557,6 +569,8 @@
         processorNode = audioContext.createScriptProcessor(BUFFER_SIZE, 1, 1);
         processorNode.onaudioprocess = (e) => {
           if (!isBroadcasting || !ws || ws.readyState !== WebSocket.OPEN) return;
+          // 聴講者が発言中は送信しない
+          if (listenerSpeaking) return;
 
           const float32 = e.inputBuffer.getChannelData(0);
           const int16 = new Int16Array(float32.length);
@@ -568,7 +582,11 @@
         };
 
         sourceNode.connect(processorNode);
-        processorNode.connect(audioContext.destination);
+        // processorNodeの出力を無音にして自分の声が聞こえないようにする
+        silentGain = audioContext.createGain();
+        silentGain.gain.value = 0;
+        processorNode.connect(silentGain);
+        silentGain.connect(audioContext.destination);
 
         isBroadcasting = true;
 
@@ -599,6 +617,7 @@
       stopSpeechRecognition();
 
       if (processorNode) { processorNode.disconnect(); processorNode = null; }
+      if (silentGain) { silentGain.disconnect(); silentGain = null; }
       if (sourceNode) { sourceNode.disconnect(); sourceNode = null; }
       if (audioContext) { audioContext.close(); audioContext = null; }
       if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }

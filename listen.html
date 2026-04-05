@@ -363,7 +363,8 @@
     document.getElementById('roomInfo').textContent = `ルーム: ${roomId}`;
 
     const SAMPLE_RATE = 16000;
-    const BUFFER_SIZE = 4096;
+    const BUFFER_SIZE = 2048;
+    const MAX_PLAYBACK_DELAY = 0.3; // 再生遅延の上限（秒）
 
     let userName = '';
     let ws = null;
@@ -381,6 +382,7 @@
     let speakProcessor = null;
     let speakSource = null;
     let speakRecognition = null;
+    let speakSilentGain = null;
 
     // --- ログイン ---
     const nameInput = document.getElementById('nameInput');
@@ -453,8 +455,14 @@
       source.connect(gainNode);
 
       const now = audioContext.currentTime;
+      // 自分が発言中は再生しない（エコー防止）
+      if (isSpeaking) return;
       if (nextPlayTime < now) {
-        nextPlayTime = now + 0.01;
+        nextPlayTime = now + 0.005;
+      }
+      // 遅延が大きくなりすぎたらリセット
+      if (nextPlayTime - now > MAX_PLAYBACK_DELAY) {
+        nextPlayTime = now + 0.005;
       }
       source.start(nextPlayTime);
       nextPlayTime += audioBuffer.duration;
@@ -552,7 +560,11 @@
         };
 
         speakSource.connect(speakProcessor);
-        speakProcessor.connect(speakAudioContext.destination);
+        // 自分の声がスピーカーから出ないよう無音ゲインを経由
+        speakSilentGain = speakAudioContext.createGain();
+        speakSilentGain.gain.value = 0;
+        speakProcessor.connect(speakSilentGain);
+        speakSilentGain.connect(speakAudioContext.destination);
 
         // 文字おこし開始
         startSpeakRecognition();
@@ -569,6 +581,7 @@
       stopSpeakRecognition();
 
       if (speakProcessor) { speakProcessor.disconnect(); speakProcessor = null; }
+      if (speakSilentGain) { speakSilentGain.disconnect(); speakSilentGain = null; }
       if (speakSource) { speakSource.disconnect(); speakSource = null; }
       if (speakAudioContext) { speakAudioContext.close(); speakAudioContext = null; }
       if (speakStream) { speakStream.getTracks().forEach(t => t.stop()); speakStream = null; }
@@ -580,6 +593,9 @@
       if (isReceiving) {
         setStatus('receiving', '受信中', '音声を再生しています');
       }
+      // 再生バッファをリセット
+      nextPlayTime = 0;
+    }
 
     // --- 聴講者の文字おこし（発言中のみ） ---
     function startSpeakRecognition() {
