@@ -285,6 +285,46 @@
       color: #53c0f0;
       margin-bottom: 12px;
     }
+
+    /* ガイドツアー */
+    .tour-overlay {
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.75);
+      z-index: 300;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .tour-overlay.hidden { display: none; }
+    .tour-spotlight {
+      position: absolute;
+      border: 3px solid #53c0f0;
+      border-radius: 16px;
+      box-shadow: 0 0 0 9999px rgba(0,0,0,0.7);
+      transition: all 0.4s ease;
+      pointer-events: none;
+    }
+    .tour-card {
+      position: absolute;
+      background: #16213e;
+      border-radius: 16px;
+      padding: 20px;
+      width: 85%;
+      max-width: 320px;
+      text-align: center;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+      z-index: 301;
+    }
+    .tour-card .tour-step { font-size: 0.75em; color: #666; margin-bottom: 8px; }
+    .tour-card .tour-title { font-size: 1.1em; font-weight: bold; color: #53c0f0; margin-bottom: 8px; }
+    .tour-card .tour-desc { font-size: 0.9em; color: #ccc; margin-bottom: 16px; line-height: 1.5; }
+    .tour-card button {
+      padding: 10px 24px; border: none; border-radius: 10px;
+      font-size: 0.95em; font-weight: bold; cursor: pointer;
+      background: #53c0f0; color: #1a1a2e;
+    }
+    .tour-card .tour-skip {
+      background: none; color: #666; font-size: 0.8em;
+      margin-top: 8px; padding: 4px;
+    }
   </style>
 </head>
 <body>
@@ -356,6 +396,18 @@
   </div>
 
   <div class="connection-status disconnected" id="connStatus">サーバー未接続</div>
+
+  <!-- ガイドツアー -->
+  <div class="tour-overlay hidden" id="tourOverlay">
+    <div class="tour-spotlight" id="tourSpotlight"></div>
+    <div class="tour-card" id="tourCard">
+      <div class="tour-step" id="tourStep"></div>
+      <div class="tour-title" id="tourTitle"></div>
+      <div class="tour-desc" id="tourDesc"></div>
+      <button id="tourNext" onclick="tourNext()">次へ</button><br>
+      <button class="tour-skip" onclick="tourFinish()">スキップ</button>
+    </div>
+  </div>
 
   <script>
     const params = new URLSearchParams(location.search);
@@ -430,6 +482,9 @@
       document.getElementById('tapOverlay').classList.add('hidden');
 
       if (!ws) connect();
+
+      // 初回ガイドツアー（接続後少し待ってから開始）
+      setTimeout(startTour, 1500);
     }
 
     function setVolume(val) {
@@ -737,6 +792,12 @@
               case 'transcription':
                 showTranscription(msg.name, msg.text, msg.isFinal);
                 break;
+              case 'room_info':
+                document.getElementById('roomInfo').textContent = `ルーム: ${msg.name}`;
+                break;
+              case 'error':
+                alert(msg.message);
+                break;
             }
           } catch (e) {}
         }
@@ -759,6 +820,86 @@
       const div = document.createElement('div');
       div.textContent = str;
       return div.innerHTML;
+    }
+
+    // --- ガイドツアー ---
+    const tourSteps = [
+      {
+        target: '#statusCard',
+        title: '音声受信エリア',
+        desc: '説明者が配信を開始すると、ここに状態が表示され、音声が自動的に再生されます。',
+      },
+      {
+        target: '.volume-control',
+        title: '音量調整',
+        desc: 'スライダーで音量を調整できます。聞こえにくい場合はここを操作してください。',
+      },
+      {
+        target: '#handRaiseArea',
+        title: '挙手ボタン',
+        desc: '質問したいときはこのボタンを押してください。説明者が発言を許可すると、マイクが有効になります。',
+      },
+      {
+        target: '.transcript-panel',
+        title: '文字おこし',
+        desc: '説明者や発言者の話した内容がリアルタイムで文字に変換されて表示されます。',
+      },
+    ];
+    let tourIndex = 0;
+
+    function startTour() {
+      if (localStorage.getItem('koecast_tour_done')) return;
+      tourIndex = 0;
+      document.getElementById('tourOverlay').classList.remove('hidden');
+      showTourStep();
+    }
+
+    function showTourStep() {
+      const step = tourSteps[tourIndex];
+      const el = document.querySelector(step.target);
+      if (!el) { tourNext(); return; }
+
+      const rect = el.getBoundingClientRect();
+      const spotlight = document.getElementById('tourSpotlight');
+      const pad = 8;
+      spotlight.style.top = (rect.top - pad) + 'px';
+      spotlight.style.left = (rect.left - pad) + 'px';
+      spotlight.style.width = (rect.width + pad * 2) + 'px';
+      spotlight.style.height = (rect.height + pad * 2) + 'px';
+
+      document.getElementById('tourStep').textContent = `${tourIndex + 1} / ${tourSteps.length}`;
+      document.getElementById('tourTitle').textContent = step.title;
+      document.getElementById('tourDesc').textContent = step.desc;
+
+      const card = document.getElementById('tourCard');
+      const isLast = tourIndex === tourSteps.length - 1;
+      document.getElementById('tourNext').textContent = isLast ? '完了' : '次へ';
+
+      // カード位置をターゲットの下に配置
+      const cardTop = rect.bottom + 16;
+      if (cardTop + 200 > window.innerHeight) {
+        card.style.top = 'auto';
+        card.style.bottom = (window.innerHeight - rect.top + 16) + 'px';
+      } else {
+        card.style.top = cardTop + 'px';
+        card.style.bottom = 'auto';
+      }
+      card.style.left = '50%';
+      card.style.transform = 'translateX(-50%)';
+    }
+
+    function tourNext() {
+      tourIndex++;
+      if (tourIndex >= tourSteps.length) {
+        tourFinish();
+      } else {
+        showTourStep();
+      }
+    }
+
+    function tourFinish() {
+      localStorage.setItem('koecast_tour_done', '1');
+      document.getElementById('tourOverlay').classList.add('hidden');
     }
   </script>
 </body>

@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KoeCast 管理画面</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #1a1a2e;
+      color: #eee;
+      min-height: 100vh;
+    }
+    /* ログイン */
+    .login-overlay {
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: #1a1a2e;
+      display: flex; align-items: center; justify-content: center;
+      z-index: 1000;
+    }
+    .login-overlay.hidden { display: none; }
+    .login-card {
+      background: #16213e;
+      border-radius: 20px;
+      padding: 32px;
+      width: 90%; max-width: 360px;
+      text-align: center;
+    }
+    .login-card h2 { font-size: 1.3em; margin-bottom: 8px; color: #e94560; }
+    .login-card p { font-size: 0.9em; color: #aaa; margin-bottom: 20px; }
+    .login-card input {
+      width: 100%; padding: 14px;
+      border: 2px solid #333; border-radius: 12px;
+      background: #0d1528; color: #eee;
+      font-size: 1em; text-align: center; outline: none;
+      margin-bottom: 16px;
+    }
+    .login-card input:focus { border-color: #e94560; }
+    .login-card button {
+      width: 100%; padding: 14px; border: none; border-radius: 12px;
+      background: #e94560; color: white;
+      font-size: 1em; font-weight: bold; cursor: pointer;
+    }
+    .login-error { color: #f44336; font-size: 0.85em; margin-bottom: 12px; display: none; }
+
+    /* ヘッダー */
+    .header {
+      background: #16213e;
+      padding: 16px 24px;
+      display: flex; align-items: center; justify-content: space-between;
+      border-bottom: 1px solid #333;
+    }
+    .header h1 { font-size: 1.2em; color: #e94560; }
+    .header .stats { font-size: 0.85em; color: #aaa; }
+
+    /* タブ */
+    .tabs {
+      display: flex; background: #16213e;
+      border-bottom: 1px solid #333;
+      overflow-x: auto;
+    }
+    .tab {
+      padding: 12px 20px; cursor: pointer;
+      color: #aaa; font-size: 0.9em;
+      border-bottom: 3px solid transparent;
+      white-space: nowrap;
+    }
+    .tab.active { color: #e94560; border-bottom-color: #e94560; }
+    .tab:hover { color: #eee; }
+
+    /* コンテンツ */
+    .content { padding: 20px; max-width: 900px; margin: 0 auto; }
+    .panel { display: none; }
+    .panel.active { display: block; }
+
+    /* ダッシュボード */
+    .stat-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 12px; margin-bottom: 24px;
+    }
+    .stat-card {
+      background: #16213e; border-radius: 12px;
+      padding: 16px; text-align: center;
+    }
+    .stat-card .value { font-size: 2em; font-weight: bold; color: #e94560; }
+    .stat-card .label { font-size: 0.8em; color: #aaa; margin-top: 4px; }
+
+    /* ルーム一覧 */
+    .room-list { display: flex; flex-direction: column; gap: 12px; }
+    .room-card {
+      background: #16213e; border-radius: 12px;
+      padding: 16px; cursor: pointer;
+      border: 2px solid transparent;
+      transition: border-color 0.2s;
+    }
+    .room-card:hover { border-color: #333; }
+    .room-card .room-header {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 8px;
+    }
+    .room-card .room-name { font-weight: bold; font-size: 1.1em; }
+    .room-card .room-id { font-size: 0.8em; color: #666; }
+    .room-card .room-status { display: flex; gap: 12px; font-size: 0.85em; color: #aaa; }
+    .badge {
+      display: inline-block; padding: 2px 8px; border-radius: 6px;
+      font-size: 0.75em; font-weight: bold;
+    }
+    .badge.active { background: #4caf50; color: white; }
+    .badge.inactive { background: #666; color: white; }
+    .badge.expired { background: #f44336; color: white; }
+
+    /* フォーム */
+    .form-group { margin-bottom: 16px; }
+    .form-group label {
+      display: block; font-size: 0.85em; color: #aaa;
+      margin-bottom: 6px;
+    }
+    .form-group input, .form-group textarea, .form-group select {
+      width: 100%; padding: 10px 12px;
+      border: 2px solid #333; border-radius: 10px;
+      background: #0d1528; color: #eee;
+      font-size: 0.95em; outline: none;
+    }
+    .form-group input:focus, .form-group textarea:focus { border-color: #e94560; }
+    .form-group textarea { resize: vertical; min-height: 60px; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+    /* ボタン */
+    .btn {
+      padding: 10px 20px; border: none; border-radius: 10px;
+      font-size: 0.9em; font-weight: bold; cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    .btn:hover { opacity: 0.85; }
+    .btn-primary { background: #e94560; color: white; }
+    .btn-secondary { background: #333; color: white; }
+    .btn-danger { background: #c62828; color: white; }
+    .btn-success { background: #4caf50; color: white; }
+    .btn-sm { padding: 6px 14px; font-size: 0.8em; }
+    .btn-group { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+
+    /* ルーム詳細 */
+    .detail-back {
+      font-size: 0.9em; color: #aaa; cursor: pointer;
+      margin-bottom: 16px; display: inline-block;
+    }
+    .detail-back:hover { color: #eee; }
+    .detail-section {
+      background: #16213e; border-radius: 12px;
+      padding: 16px; margin-bottom: 16px;
+    }
+    .detail-section h3 {
+      font-size: 1em; margin-bottom: 12px;
+      color: #53c0f0;
+    }
+
+    /* QRコード */
+    .qr-container {
+      display: flex; gap: 24px; flex-wrap: wrap;
+    }
+    .qr-item {
+      text-align: center; background: #0d1528;
+      border-radius: 12px; padding: 16px;
+      flex: 1; min-width: 200px;
+    }
+    .qr-item h4 { font-size: 0.9em; margin-bottom: 8px; color: #aaa; }
+    .qr-item canvas { display: block; margin: 0 auto 8px; }
+    .qr-url {
+      font-size: 0.7em; color: #666;
+      word-break: break-all; margin-top: 8px;
+    }
+
+    /* テーブル */
+    .data-table {
+      width: 100%; border-collapse: collapse;
+      font-size: 0.85em;
+    }
+    .data-table th {
+      text-align: left; padding: 8px 12px;
+      color: #aaa; border-bottom: 1px solid #333;
+      font-weight: normal;
+    }
+    .data-table td {
+      padding: 8px 12px;
+      border-bottom: 1px solid #222;
+    }
+    .data-table tr:hover { background: #1a1a2e; }
+    .pagination {
+      display: flex; justify-content: center; gap: 8px;
+      margin-top: 12px;
+    }
+
+    .empty-msg { text-align: center; color: #666; padding: 24px; }
+
+    /* モーダル */
+    .modal-overlay {
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.7);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 500;
+    }
+    .modal-overlay.hidden { display: none; }
+    .modal {
+      background: #16213e; border-radius: 16px;
+      padding: 24px; width: 90%; max-width: 500px;
+      max-height: 80vh; overflow-y: auto;
+    }
+    .modal h2 { font-size: 1.1em; margin-bottom: 16px; color: #e94560; }
+  </style>
+</head>
+<body>
+
+  <!-- ログイン -->
+  <div class="login-overlay" id="loginOverlay">
+    <div class="login-card">
+      <h2>KoeCast 管理画面</h2>
+      <p>パスワードを入力してください</p>
+      <div class="login-error" id="loginError">パスワードが正しくありません</div>
+      <input type="password" id="passwordInput" placeholder="パスワード" autocomplete="off">
+      <button onclick="doLogin()">ログイン</button>
+    </div>
+  </div>
+
+  <!-- メイン画面 -->
+  <div class="header">
+    <h1>KoeCast 管理画面</h1>
+    <div class="stats" id="headerStats">-</div>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" data-panel="dashboard" onclick="switchTab(this)">ダッシュボード</div>
+    <div class="tab" data-panel="rooms" onclick="switchTab(this)">ルーム管理</div>
+    <div class="tab" data-panel="roomDetail" id="tabDetail" style="display:none" onclick="switchTab(this)">ルーム詳細</div>
+  </div>
+
+  <div class="content">
+    <!-- ダッシュボード -->
+    <div class="panel active" id="panelDashboard">
+      <div class="stat-grid" id="statGrid">
+        <div class="stat-card"><div class="value" id="statRooms">-</div><div class="label">ルーム数</div></div>
+        <div class="stat-card"><div class="value" id="statHosts">-</div><div class="label">配信中</div></div>
+        <div class="stat-card"><div class="value" id="statListeners">-</div><div class="label">聴講者</div></div>
+        <div class="stat-card"><div class="value" id="statMemory">-</div><div class="label">メモリ (MB)</div></div>
+        <div class="stat-card"><div class="value" id="statUptime">-</div><div class="label">稼働時間</div></div>
+      </div>
+      <h3 style="margin-bottom: 12px; color: #53c0f0;">アクティブルーム</h3>
+      <div id="activeRoomList" class="room-list">
+        <div class="empty-msg">アクティブなルームはありません</div>
+      </div>
+    </div>
+
+    <!-- ルーム管理 -->
+    <div class="panel" id="panelRooms">
+      <div class="btn-group" style="margin-bottom: 16px;">
+        <button class="btn btn-primary" onclick="showCreateRoom()">+ 新規ルーム作成</button>
+      </div>
+      <div id="roomList" class="room-list">
+        <div class="empty-msg">ルームがありません</div>
+      </div>
+    </div>
+
+    <!-- ルーム詳細 -->
+    <div class="panel" id="panelRoomDetail">
+      <div class="detail-back" onclick="closeDetail()">&larr; ルーム一覧に戻る</div>
+      <div id="detailContent"></div>
+    </div>
+  </div>
+
+  <!-- ルーム作成/編集モーダル -->
+  <div class="modal-overlay hidden" id="roomModal">
+    <div class="modal">
+      <h2 id="modalTitle">新規ルーム作成</h2>
+      <input type="hidden" id="modalMode" value="create">
+      <div class="form-group">
+        <label>ルームID（英数字・半角、変更不可）</label>
+        <input type="text" id="formRoomId" placeholder="例: factory-a">
+      </div>
+      <div class="form-group">
+        <label>ルーム名</label>
+        <input type="text" id="formRoomName" placeholder="例: 工場Aライン見学">
+      </div>
+      <div class="form-group">
+        <label>説明（任意）</label>
+        <textarea id="formRoomDesc" placeholder="見学グループの概要など"></textarea>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>開始日時（任意）</label>
+          <input type="datetime-local" id="formStartsAt">
+        </div>
+        <div class="form-group">
+          <label>終了日時（任意）</label>
+          <input type="datetime-local" id="formExpiresAt">
+        </div>
+      </div>
+      <div class="btn-group">
+        <button class="btn btn-primary" onclick="saveRoom()">保存</button>
+        <button class="btn btn-secondary" onclick="closeModal()">キャンセル</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"></script>
+  <script>
+    let token = '';
+    let ws = null;
+    let allRooms = [];
+    let currentDetailRoom = null;
+
+    // --- ログイン ---
+    document.getElementById('passwordInput').addEventListener('keydown', e => {
+      if (e.key === 'Enter') doLogin();
+    });
+
+    async function doLogin() {
+      const pw = document.getElementById('passwordInput').value;
+      token = pw;
+      try {
+        const res = await api('GET', '/api/stats');
+        if (res.ok) {
+          document.getElementById('loginOverlay').classList.add('hidden');
+          init();
+        } else {
+          document.getElementById('loginError').style.display = 'block';
+        }
+      } catch {
+        document.getElementById('loginError').style.display = 'block';
+      }
+    }
+
+    async function api(method, path, body) {
+      const opts = {
+        method,
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      };
+      if (body) opts.body = JSON.stringify(body);
+      return fetch(path, opts);
+    }
+
+    async function apiJSON(method, path, body) {
+      const res = await api(method, path, body);
+      return res.json();
+    }
+
+    // --- 初期化 ---
+    function init() {
+      loadRooms();
+      loadStats();
+      connectAdminWS();
+      setInterval(loadStats, 10000);
+    }
+
+    function connectAdminWS() {
+      const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      ws = new WebSocket(`${protocol}//${location.host}?role=admin`);
+      ws.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+          if (msg.type === 'admin_update') {
+            updateActiveRooms(msg.rooms);
+          }
+        } catch {}
+      };
+      ws.onclose = () => { setTimeout(connectAdminWS, 3000); };
+    }
+
+    // --- タブ ---
+    function switchTab(el) {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+      el.classList.add('active');
+      document.getElementById('panel' + capitalize(el.dataset.panel)).classList.add('active');
+    }
+    function capitalize(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+
+    // --- ダッシュボード ---
+    async function loadStats() {
+      try {
+        const stats = await apiJSON('GET', '/api/stats');
+        document.getElementById('statRooms').textContent = stats.activeRooms;
+        document.getElementById('statHosts').textContent = stats.totalHosts;
+        document.getElementById('statListeners').textContent = stats.totalListeners;
+        document.getElementById('statMemory').textContent = Math.round(stats.memory.rss / 1024 / 1024);
+        document.getElementById('statUptime').textContent = formatUptime(stats.uptime);
+        document.getElementById('headerStats').textContent =
+          `接続: ${stats.totalConnections} | メモリ: ${Math.round(stats.memory.rss / 1024 / 1024)}MB`;
+      } catch {}
+    }
+
+    function formatUptime(sec) {
+      const h = Math.floor(sec / 3600);
+      const m = Math.floor((sec % 3600) / 60);
+      if (h > 0) return `${h}h ${m}m`;
+      return `${m}m`;
+    }
+
+    function updateActiveRooms(roomsData) {
+      allRooms = roomsData;
+      const container = document.getElementById('activeRoomList');
+      const active = roomsData.filter(r => r.live_host_connected || r.live_listeners > 0);
+      if (active.length === 0) {
+        container.innerHTML = '<div class="empty-msg">アクティブなルームはありません</div>';
+        return;
+      }
+      container.innerHTML = active.map(r => roomCardHTML(r)).join('');
+    }
+
+    // --- ルーム管理 ---
+    async function loadRooms() {
+      const rooms = await apiJSON('GET', '/api/rooms');
+      allRooms = rooms;
+      renderRoomList(rooms);
+    }
+
+    function renderRoomList(rooms) {
+      const container = document.getElementById('roomList');
+      if (rooms.length === 0) {
+        container.innerHTML = '<div class="empty-msg">ルームがありません。「新規ルーム作成」で作成してください。</div>';
+        return;
+      }
+      container.innerHTML = rooms.map(r => roomCardHTML(r)).join('');
+    }
+
+    function roomCardHTML(r) {
+      let badgeClass = 'active';
+      let badgeText = '有効';
+      if (!r.is_active) { badgeClass = 'inactive'; badgeText = '無効'; }
+      else if (r.expires_at && new Date(r.expires_at) < new Date()) { badgeClass = 'expired'; badgeText = '期限切れ'; }
+      else if (r.starts_at && new Date(r.starts_at) > new Date()) { badgeClass = 'inactive'; badgeText = '開始前'; }
+
+      const expires = r.expires_at ? formatDT(r.expires_at) : '制限なし';
+      return `
+        <div class="room-card" onclick="openDetail('${escapeAttr(r.id)}')">
+          <div class="room-header">
+            <span class="room-name">${esc(r.name)}</span>
+            <span class="badge ${badgeClass}">${badgeText}</span>
+          </div>
+          <div class="room-id">ID: ${esc(r.id)}</div>
+          <div class="room-status">
+            <span>${r.live_host_connected ? '🎙️ 配信中' : '⏸️ 待機'}</span>
+            <span>👥 ${r.live_listeners || 0}人</span>
+            <span>〜${expires}</span>
+          </div>
+        </div>`;
+    }
+
+    // --- ルーム作成 ---
+    function showCreateRoom() {
+      document.getElementById('modalTitle').textContent = '新規ルーム作成';
+      document.getElementById('modalMode').value = 'create';
+      document.getElementById('formRoomId').value = '';
+      document.getElementById('formRoomId').disabled = false;
+      document.getElementById('formRoomName').value = '';
+      document.getElementById('formRoomDesc').value = '';
+      document.getElementById('formStartsAt').value = '';
+      document.getElementById('formExpiresAt').value = '';
+      document.getElementById('roomModal').classList.remove('hidden');
+    }
+
+    function showEditRoom(room) {
+      document.getElementById('modalTitle').textContent = 'ルーム編集';
+      document.getElementById('modalMode').value = 'edit';
+      document.getElementById('formRoomId').value = room.id;
+      document.getElementById('formRoomId').disabled = true;
+      document.getElementById('formRoomName').value = room.name;
+      document.getElementById('formRoomDesc').value = room.description || '';
+      document.getElementById('formStartsAt').value = room.starts_at ? room.starts_at.slice(0, 16) : '';
+      document.getElementById('formExpiresAt').value = room.expires_at ? room.expires_at.slice(0, 16) : '';
+      document.getElementById('roomModal').classList.remove('hidden');
+    }
+
+    function closeModal() {
+      document.getElementById('roomModal').classList.add('hidden');
+    }
+
+    async function saveRoom() {
+      const mode = document.getElementById('modalMode').value;
+      const id = document.getElementById('formRoomId').value.trim();
+      const name = document.getElementById('formRoomName').value.trim();
+      if (!id || !name) { alert('ルームIDとルーム名は必須です'); return; }
+
+      const body = {
+        id,
+        name,
+        description: document.getElementById('formRoomDesc').value.trim(),
+        starts_at: document.getElementById('formStartsAt').value || null,
+        expires_at: document.getElementById('formExpiresAt').value || null,
+      };
+
+      if (mode === 'create') {
+        const res = await api('POST', '/api/rooms', body);
+        if (!res.ok) {
+          const err = await res.json();
+          alert(err.error || 'エラーが発生しました');
+          return;
+        }
+      } else {
+        await api('PUT', `/api/rooms/${encodeURIComponent(id)}`, body);
+      }
+
+      closeModal();
+      await loadRooms();
+      if (currentDetailRoom === id) openDetail(id);
+    }
+
+    async function deleteRoom(id) {
+      if (!confirm(`ルーム「${id}」を削除しますか？\n文字おこし履歴・接続ログも全て削除されます。`)) return;
+      await api('DELETE', `/api/rooms/${encodeURIComponent(id)}`);
+      closeDetail();
+      await loadRooms();
+    }
+
+    async function toggleRoom(id, currentActive) {
+      await api('PUT', `/api/rooms/${encodeURIComponent(id)}`, { is_active: !currentActive });
+      await loadRooms();
+      openDetail(id);
+    }
+
+    // --- ルーム詳細 ---
+    async function openDetail(roomId) {
+      currentDetailRoom = roomId;
+      const tabDetail = document.getElementById('tabDetail');
+      tabDetail.style.display = 'block';
+      tabDetail.click();
+
+      const room = allRooms.find(r => r.id === roomId);
+      if (!room) return;
+
+      const baseUrl = `${location.protocol}//${location.host}`;
+      const hostUrl = `${baseUrl}/host.html?room=${encodeURIComponent(roomId)}`;
+      const listenUrl = `${baseUrl}/listen.html?room=${encodeURIComponent(roomId)}`;
+
+      let html = `
+        <h2 style="margin-bottom: 16px;">${esc(room.name)}</h2>
+
+        <div class="detail-section">
+          <h3>ルーム情報</h3>
+          <table class="data-table">
+            <tr><th style="width:120px">ID</th><td>${esc(room.id)}</td></tr>
+            <tr><th>説明</th><td>${esc(room.description || '-')}</td></tr>
+            <tr><th>開始日時</th><td>${room.starts_at ? formatDT(room.starts_at) : '制限なし'}</td></tr>
+            <tr><th>終了日時</th><td>${room.expires_at ? formatDT(room.expires_at) : '制限なし'}</td></tr>
+            <tr><th>状態</th><td>${room.is_active ? '✅ 有効' : '⛔ 無効'}</td></tr>
+            <tr><th>作成日</th><td>${room.created_at ? formatDT(room.created_at) : '-'}</td></tr>
+          </table>
+          <div class="btn-group">
+            <button class="btn btn-secondary btn-sm" onclick='showEditRoom(${JSON.stringify(room)})'>編集</button>
+            <button class="btn btn-sm ${room.is_active ? 'btn-secondary' : 'btn-success'}" onclick="toggleRoom('${escapeAttr(room.id)}', ${room.is_active})">${room.is_active ? '無効にする' : '有効にする'}</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteRoom('${escapeAttr(room.id)}')">削除</button>
+          </div>
+        </div>
+
+        <div class="detail-section">
+          <h3>QRコード</h3>
+          <div class="qr-container">
+            <div class="qr-item">
+              <h4>説明者用</h4>
+              <canvas id="qrHost"></canvas>
+              <div class="qr-url">${esc(hostUrl)}</div>
+            </div>
+            <div class="qr-item">
+              <h4>聴講者用</h4>
+              <canvas id="qrListen"></canvas>
+              <div class="qr-url">${esc(listenUrl)}</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="detail-section">
+          <h3>接続ログ</h3>
+          <div id="logTable"></div>
+        </div>
+
+        <div class="detail-section">
+          <h3>文字おこし履歴</h3>
+          <div id="transcriptTable"></div>
+        </div>`;
+
+      document.getElementById('detailContent').innerHTML = html;
+
+      // QRコード生成
+      QRCode.toCanvas(document.getElementById('qrHost'), hostUrl, { width: 180, margin: 2, color: { dark: '#e94560', light: '#0d1528' } });
+      QRCode.toCanvas(document.getElementById('qrListen'), listenUrl, { width: 180, margin: 2, color: { dark: '#0f3460', light: '#0d1528' } });
+
+      // ログ・文字おこし読み込み
+      loadLogs(roomId);
+      loadTranscripts(roomId);
+    }
+
+    async function loadLogs(roomId, offset = 0) {
+      const data = await apiJSON('GET', `/api/rooms/${encodeURIComponent(roomId)}/logs?limit=50&offset=${offset}`);
+      const container = document.getElementById('logTable');
+      if (data.rows.length === 0) {
+        container.innerHTML = '<div class="empty-msg">接続ログはまだありません</div>';
+        return;
+      }
+      let html = `<table class="data-table">
+        <tr><th>日時</th><th>名前</th><th>役割</th><th>操作</th></tr>`;
+      for (const row of data.rows) {
+        const action = row.action === 'connect' ? '🟢 接続' : '🔴 切断';
+        const role = row.role === 'host' ? '説明者' : '聴講者';
+        html += `<tr><td>${formatDT(row.created_at)}</td><td>${esc(row.user_name)}</td><td>${role}</td><td>${action}</td></tr>`;
+      }
+      html += '</table>';
+      if (data.total > 50) {
+        html += `<div class="pagination">`;
+        if (offset > 0) html += `<button class="btn btn-sm btn-secondary" onclick="loadLogs('${escapeAttr(roomId)}', ${offset - 50})">前へ</button>`;
+        html += `<span style="color:#aaa;padding:6px">${offset + 1}〜${Math.min(offset + 50, data.total)} / ${data.total}件</span>`;
+        if (offset + 50 < data.total) html += `<button class="btn btn-sm btn-secondary" onclick="loadLogs('${escapeAttr(roomId)}', ${offset + 50})">次へ</button>`;
+        html += '</div>';
+      }
+      container.innerHTML = html;
+    }
+
+    async function loadTranscripts(roomId, offset = 0) {
+      const data = await apiJSON('GET', `/api/rooms/${encodeURIComponent(roomId)}/transcriptions?limit=50&offset=${offset}`);
+      const container = document.getElementById('transcriptTable');
+      if (data.rows.length === 0) {
+        container.innerHTML = '<div class="empty-msg">文字おこし履歴はまだありません</div>';
+        return;
+      }
+      let html = `<table class="data-table">
+        <tr><th>日時</th><th>話者</th><th>内容</th></tr>`;
+      for (const row of data.rows) {
+        html += `<tr><td style="white-space:nowrap">${formatDT(row.created_at)}</td><td style="white-space:nowrap">${esc(row.speaker_name)}</td><td>${esc(row.text)}</td></tr>`;
+      }
+      html += '</table>';
+      if (data.total > 50) {
+        html += `<div class="pagination">`;
+        if (offset > 0) html += `<button class="btn btn-sm btn-secondary" onclick="loadTranscripts('${escapeAttr(roomId)}', ${offset - 50})">前へ</button>`;
+        html += `<span style="color:#aaa;padding:6px">${offset + 1}〜${Math.min(offset + 50, data.total)} / ${data.total}件</span>`;
+        if (offset + 50 < data.total) html += `<button class="btn btn-sm btn-secondary" onclick="loadTranscripts('${escapeAttr(roomId)}', ${offset + 50})">次へ</button>`;
+        html += '</div>';
+      }
+      container.innerHTML = html;
+    }
+
+    function closeDetail() {
+      currentDetailRoom = null;
+      document.getElementById('tabDetail').style.display = 'none';
+      document.querySelector('[data-panel="rooms"]').click();
+    }
+
+    // --- ユーティリティ ---
+    function esc(str) {
+      const div = document.createElement('div');
+      div.textContent = str || '';
+      return div.innerHTML;
+    }
+    function escapeAttr(str) {
+      return str.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+    }
+    function formatDT(str) {
+      if (!str) return '-';
+      const d = new Date(str);
+      if (isNaN(d)) return str;
+      return d.toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    }
+  </script>
+</body>
+</html>

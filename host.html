@@ -318,6 +318,12 @@
 
           } else if (msg.type === 'transcription') {
             showTranscription(msg.name, msg.text, msg.isFinal);
+
+          } else if (msg.type === 'room_info') {
+            document.getElementById('roomInfo').textContent = `ルーム: ${msg.name}`;
+
+          } else if (msg.type === 'error') {
+            showError(msg.message);
           }
         } catch (e) {}
       };
