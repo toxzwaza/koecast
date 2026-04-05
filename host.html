@@ -103,6 +103,21 @@
     </button>
   </div>
 
+  <!-- 聴講者用QRコード -->
+  <div class="bg-surface-card rounded-2xl p-4 w-full max-w-[400px] mb-5 border border-slate-700/50">
+    <h2 class="text-sm font-semibold mb-3 text-accent-blue flex items-center gap-1.5">
+      <span>📱</span> 聴講者用QRコード
+    </h2>
+    <div class="bg-surface rounded-xl p-4 text-center">
+      <img id="qrListenImg" width="180" height="180" alt="QR" class="mx-auto rounded-lg mb-3">
+      <div class="flex gap-2 justify-center mb-2">
+        <button onclick="copyQRImage()" class="px-3 py-1.5 bg-slate-600 hover:bg-slate-500 text-slate-200 text-xs font-medium rounded-lg border-none cursor-pointer transition-colors" id="btnCopyQR">QR画像コピー</button>
+        <button onclick="copyListenURL()" class="px-3 py-1.5 bg-slate-600 hover:bg-slate-500 text-slate-200 text-xs font-medium rounded-lg border-none cursor-pointer transition-colors" id="btnCopyURL">URLコピー</button>
+      </div>
+      <div class="text-[0.65em] text-slate-500 break-all" id="listenURL"></div>
+    </div>
+  </div>
+
   <!-- 文字おこしパネル -->
   <div class="bg-surface-card rounded-2xl p-4 w-full max-w-[400px] mb-5 border border-slate-700/50">
     <h2 class="text-sm font-semibold mb-3 text-accent-blue flex items-center gap-1.5">
@@ -115,10 +130,67 @@
 
   <div class="connection-status disconnected text-xs mt-3" id="connStatus">サーバー未接続</div>
 
+  <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
   <script>
     const params = new URLSearchParams(location.search);
     const roomId = params.get('room') || 'default';
     document.getElementById('roomInfo').textContent = `ルーム: ${roomId}`;
+
+    // --- QRコード生成 ---
+    const listenUrl = `${location.protocol}//${location.host}/listen.html?room=${encodeURIComponent(roomId)}`;
+    document.getElementById('listenURL').textContent = listenUrl;
+
+    function generateQRDataURL(text, color) {
+      const qr = qrcode(0, 'M');
+      qr.addData(text);
+      qr.make();
+      const size = qr.getModuleCount();
+      const cellSize = 4;
+      const margin = 8;
+      const imgSize = size * cellSize + margin * 2;
+      const canvas = document.createElement('canvas');
+      canvas.width = imgSize;
+      canvas.height = imgSize;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#f0f0f0';
+      ctx.fillRect(0, 0, imgSize, imgSize);
+      ctx.fillStyle = color || '#000000';
+      for (let row = 0; row < size; row++) {
+        for (let col = 0; col < size; col++) {
+          if (qr.isDark(row, col)) {
+            ctx.fillRect(col * cellSize + margin, row * cellSize + margin, cellSize, cellSize);
+          }
+        }
+      }
+      return canvas.toDataURL('image/png');
+    }
+
+    document.getElementById('qrListenImg').src = generateQRDataURL(listenUrl, '#6366f1');
+
+    async function copyQRImage() {
+      const img = document.getElementById('qrListenImg');
+      const btn = document.getElementById('btnCopyQR');
+      try {
+        const res = await fetch(img.src);
+        const blob = await res.blob();
+        await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+        const orig = btn.textContent;
+        btn.textContent = 'コピー済み!';
+        btn.style.color = '#22c55e';
+        setTimeout(() => { btn.textContent = orig; btn.style.color = ''; }, 2000);
+      } catch { alert('画像コピーに失敗しました'); }
+    }
+
+    async function copyListenURL() {
+      const btn = document.getElementById('btnCopyURL');
+      try {
+        await navigator.clipboard.writeText(listenUrl);
+        const orig = btn.textContent;
+        btn.textContent = 'コピー済み!';
+        btn.style.color = '#22c55e';
+        setTimeout(() => { btn.textContent = orig; btn.style.color = ''; }, 2000);
+      } catch { alert('コピーに失敗しました'); }
+    }
 
     const SAMPLE_RATE = 16000;
     const BUFFER_SIZE = 2048;
