@@ -165,11 +165,22 @@
       flex: 1; min-width: 200px;
     }
     .qr-item h4 { font-size: 0.9em; margin-bottom: 8px; color: #aaa; }
-    .qr-item canvas { display: block; margin: 0 auto 8px; }
+    .qr-item img { display: block; margin: 0 auto 8px; border-radius: 8px; }
     .qr-url {
       font-size: 0.7em; color: #666;
       word-break: break-all; margin-top: 8px;
     }
+    .qr-buttons {
+      display: flex; gap: 6px; justify-content: center;
+      margin-top: 10px;
+    }
+    .qr-buttons button {
+      padding: 6px 12px; border: none; border-radius: 8px;
+      font-size: 0.75em; cursor: pointer;
+      background: #333; color: #ccc;
+    }
+    .qr-buttons button:hover { background: #444; }
+    .copy-ok { color: #4caf50 !important; }
 
     /* テーブル */
     .data-table {
@@ -556,12 +567,20 @@
           <div class="qr-container">
             <div class="qr-item">
               <h4>説明者用</h4>
-              <canvas id="qrHost"></canvas>
+              <img id="qrHostImg" width="180" height="180" alt="QR">
+              <div class="qr-buttons">
+                <button onclick="copyQRImage('qrHostImg')">QR画像コピー</button>
+                <button onclick="copyText('${esc(hostUrl)}', this)">URLコピー</button>
+              </div>
               <div class="qr-url">${esc(hostUrl)}</div>
             </div>
             <div class="qr-item">
               <h4>聴講者用</h4>
-              <canvas id="qrListen"></canvas>
+              <img id="qrListenImg" width="180" height="180" alt="QR">
+              <div class="qr-buttons">
+                <button onclick="copyQRImage('qrListenImg')">QR画像コピー</button>
+                <button onclick="copyText('${esc(listenUrl)}', this)">URLコピー</button>
+              </div>
               <div class="qr-url">${esc(listenUrl)}</div>
             </div>
           </div>
@@ -579,9 +598,13 @@
 
       document.getElementById('detailContent').innerHTML = html;
 
-      // QRコード生成
-      QRCode.toCanvas(document.getElementById('qrHost'), hostUrl, { width: 180, margin: 2, color: { dark: '#e94560', light: '#0d1528' } });
-      QRCode.toCanvas(document.getElementById('qrListen'), listenUrl, { width: 180, margin: 2, color: { dark: '#0f3460', light: '#0d1528' } });
+      // QRコード生成（toDataURL → img）
+      QRCode.toDataURL(hostUrl, { width: 180, margin: 2, color: { dark: '#e94560', light: '#f0f0f0' } }, (err, url) => {
+        if (!err) document.getElementById('qrHostImg').src = url;
+      });
+      QRCode.toDataURL(listenUrl, { width: 180, margin: 2, color: { dark: '#0f3460', light: '#f0f0f0' } }, (err, url) => {
+        if (!err) document.getElementById('qrListenImg').src = url;
+      });
 
       // ログ・文字おこし読み込み
       loadLogs(roomId);
@@ -656,6 +679,32 @@
       const d = new Date(str);
       if (isNaN(d)) return str;
       return d.toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    }
+
+    // --- クリップボードコピー ---
+    async function copyText(text, btn) {
+      try {
+        await navigator.clipboard.writeText(text);
+        const orig = btn.textContent;
+        btn.textContent = 'コピー済み!';
+        btn.classList.add('copy-ok');
+        setTimeout(() => { btn.textContent = orig; btn.classList.remove('copy-ok'); }, 2000);
+      } catch { alert('コピーに失敗しました'); }
+    }
+
+    async function copyQRImage(imgId) {
+      const img = document.getElementById(imgId);
+      if (!img || !img.src) return;
+      try {
+        const res = await fetch(img.src);
+        const blob = await res.blob();
+        await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+        const btn = img.closest('.qr-item').querySelector('.qr-buttons button');
+        const orig = btn.textContent;
+        btn.textContent = 'コピー済み!';
+        btn.classList.add('copy-ok');
+        setTimeout(() => { btn.textContent = orig; btn.classList.remove('copy-ok'); }, 2000);
+      } catch { alert('画像コピーに失敗しました（ブラウザが非対応の場合があります）'); }
     }
   </script>
 </body>
