@@ -312,12 +312,59 @@
     </div>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
+  <script>
+    // qrcode-generator を使ったQRコード DataURL生成
+    function generateQRDataURL(text, color) {
+      const qr = qrcode(0, 'M');
+      qr.addData(text);
+      qr.make();
+      // SVGベースでDataURL生成
+      const size = qr.getModuleCount();
+      const cellSize = 4;
+      const margin = 8;
+      const imgSize = size * cellSize + margin * 2;
+      const canvas = document.createElement('canvas');
+      canvas.width = imgSize;
+      canvas.height = imgSize;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#f0f0f0';
+      ctx.fillRect(0, 0, imgSize, imgSize);
+      ctx.fillStyle = color || '#000000';
+      for (let row = 0; row < size; row++) {
+        for (let col = 0; col < size; col++) {
+          if (qr.isDark(row, col)) {
+            ctx.fillRect(col * cellSize + margin, row * cellSize + margin, cellSize, cellSize);
+          }
+        }
+      }
+      return canvas.toDataURL('image/png');
+    }
+  </script>
   <script>
     let token = '';
     let ws = null;
     let allRooms = [];
     let currentDetailRoom = null;
+
+    // --- セッション復元 ---
+    (function restoreSession() {
+      const saved = sessionStorage.getItem('koecast_admin_token');
+      if (saved) {
+        token = saved;
+        // 非同期で検証
+        fetch('/api/stats', { headers: { 'Authorization': `Bearer ${saved}` } })
+          .then(res => {
+            if (res.ok) {
+              document.getElementById('loginOverlay').classList.add('hidden');
+              init();
+            } else {
+              sessionStorage.removeItem('koecast_admin_token');
+              token = '';
+            }
+          }).catch(() => {});
+      }
+    })();
 
     // --- ログイン ---
     document.getElementById('passwordInput').addEventListener('keydown', e => {
@@ -330,6 +377,7 @@
       try {
         const res = await api('GET', '/api/stats');
         if (res.ok) {
+          sessionStorage.setItem('koecast_admin_token', pw);
           document.getElementById('loginOverlay').classList.add('hidden');
           init();
         } else {
@@ -598,13 +646,9 @@
 
       document.getElementById('detailContent').innerHTML = html;
 
-      // QRコード生成（toDataURL → img）
-      QRCode.toDataURL(hostUrl, { width: 180, margin: 2, color: { dark: '#e94560', light: '#f0f0f0' } }, (err, url) => {
-        if (!err) document.getElementById('qrHostImg').src = url;
-      });
-      QRCode.toDataURL(listenUrl, { width: 180, margin: 2, color: { dark: '#0f3460', light: '#f0f0f0' } }, (err, url) => {
-        if (!err) document.getElementById('qrListenImg').src = url;
-      });
+      // QRコード生成
+      document.getElementById('qrHostImg').src = generateQRDataURL(hostUrl, '#e94560');
+      document.getElementById('qrListenImg').src = generateQRDataURL(listenUrl, '#0f3460');
 
       // ログ・文字おこし読み込み
       loadLogs(roomId);
