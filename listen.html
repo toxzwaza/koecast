@@ -70,6 +70,68 @@
 
     .listener-count { font-size: 0.9em; color: #aaa; margin-top: 8px; }
 
+    /* ログイン画面 */
+    .login-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.92);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+    }
+    .login-overlay.hidden { display: none; }
+    .login-card {
+      background: #16213e;
+      border-radius: 20px;
+      padding: 32px;
+      width: 90%;
+      max-width: 360px;
+      text-align: center;
+    }
+    .login-card h2 {
+      font-size: 1.3em;
+      margin-bottom: 8px;
+      color: #0f3460;
+    }
+    .login-card p {
+      font-size: 0.9em;
+      color: #aaa;
+      margin-bottom: 20px;
+    }
+    .login-card input {
+      width: 100%;
+      padding: 14px;
+      border: 2px solid #333;
+      border-radius: 12px;
+      background: #0d1528;
+      color: #eee;
+      font-size: 1.1em;
+      text-align: center;
+      outline: none;
+      margin-bottom: 16px;
+    }
+    .login-card input:focus {
+      border-color: #0f3460;
+    }
+    .login-card button {
+      width: 100%;
+      padding: 14px;
+      border: none;
+      border-radius: 12px;
+      background: #0f3460;
+      color: white;
+      font-size: 1.1em;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    .login-card button:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    /* 音声有効化オーバーレイ */
     .tap-overlay {
       position: fixed;
       top: 0; left: 0; right: 0; bottom: 0;
@@ -88,10 +150,7 @@
       color: white;
       margin-bottom: 8px;
     }
-    .tap-overlay .tap-sub {
-      font-size: 0.9em;
-      color: #aaa;
-    }
+    .tap-overlay .tap-sub { font-size: 0.9em; color: #aaa; }
 
     .volume-control {
       width: 100%;
@@ -119,6 +178,99 @@
       cursor: pointer;
     }
 
+    /* 挙手ボタン */
+    .hand-raise-area {
+      width: 100%;
+      max-width: 400px;
+      margin-bottom: 16px;
+    }
+    .btn-hand {
+      width: 100%;
+      padding: 16px;
+      border: none;
+      border-radius: 12px;
+      font-size: 1.1em;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-hand.idle {
+      background: #ffc107;
+      color: #333;
+    }
+    .btn-hand.raised {
+      background: #e94560;
+      color: white;
+      animation: pulseHand 1.5s infinite;
+    }
+    @keyframes pulseHand {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(233, 69, 96, 0.5); }
+      50% { box-shadow: 0 0 0 12px rgba(233, 69, 96, 0); }
+    }
+
+    /* 発言中モード */
+    .speaking-mode {
+      background: #4caf50;
+      color: white;
+      border-radius: 12px;
+      padding: 16px;
+      width: 100%;
+      max-width: 400px;
+      text-align: center;
+      margin-bottom: 16px;
+      display: none;
+      animation: speakPulse 2s infinite;
+    }
+    @keyframes speakPulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.5); }
+      50% { box-shadow: 0 0 0 12px rgba(76, 175, 80, 0); }
+    }
+    .speaking-mode .mic-icon { font-size: 2em; }
+    .speaking-mode .speaking-text { font-size: 1.1em; font-weight: bold; margin-top: 8px; }
+
+    /* 他の人が発言中 */
+    .other-speaking {
+      background: #16213e;
+      border: 2px solid #4caf50;
+      border-radius: 12px;
+      padding: 12px;
+      width: 100%;
+      max-width: 400px;
+      text-align: center;
+      margin-bottom: 16px;
+      display: none;
+      font-size: 0.95em;
+    }
+
+    /* 文字おこしパネル */
+    .transcript-panel {
+      background: #16213e;
+      border-radius: 16px;
+      padding: 16px;
+      width: 100%;
+      max-width: 400px;
+      margin-bottom: 20px;
+    }
+    .transcript-panel h2 {
+      font-size: 1em;
+      margin-bottom: 12px;
+      color: #53c0f0;
+    }
+    .transcript-box {
+      background: #0d1528;
+      border-radius: 10px;
+      padding: 12px;
+      max-height: 200px;
+      overflow-y: auto;
+      font-size: 0.9em;
+      line-height: 1.6;
+    }
+    .transcript-line { margin-bottom: 4px; }
+    .transcript-line .speaker { color: #e94560; font-weight: bold; }
+    .transcript-line .text { color: #ddd; }
+    .transcript-line .interim { color: #888; font-style: italic; }
+    .transcript-empty { color: #666; text-align: center; }
+
     .connection-status {
       font-size: 0.85em;
       color: #aaa;
@@ -126,18 +278,35 @@
     }
     .connection-status.connected { color: #4caf50; }
     .connection-status.disconnected { color: #f44336; }
+
+    .user-name-display {
+      font-size: 0.9em;
+      color: #53c0f0;
+      margin-bottom: 12px;
+    }
   </style>
 </head>
 <body>
 
-  <!-- 音声有効化オーバーレイ（タップ必須） -->
-  <div class="tap-overlay" id="tapOverlay" onclick="unlockAudio()">
+  <!-- ログイン画面 -->
+  <div class="login-overlay" id="loginOverlay">
+    <div class="login-card">
+      <h2>工場見学</h2>
+      <p>お名前を入力して参加してください</p>
+      <input type="text" id="nameInput" placeholder="お名前" maxlength="20" autocomplete="off">
+      <button id="btnJoin" onclick="joinWithName()" disabled>参加する</button>
+    </div>
+  </div>
+
+  <!-- 音声有効化オーバーレイ -->
+  <div class="tap-overlay hidden" id="tapOverlay" onclick="unlockAudio()">
     <div class="tap-icon">🔊</div>
-    <div class="tap-text">画面をタップして開始</div>
+    <div class="tap-text">画面をタップして音声を有効化</div>
     <div class="tap-sub">音声を再生するにはタップが必要です</div>
   </div>
 
   <h1>音声受信（聴講者）</h1>
+  <div class="user-name-display" id="userNameDisplay"></div>
   <div class="room-info" id="roomInfo">ルーム: -</div>
 
   <div class="status-card status-waiting" id="statusCard">
@@ -154,9 +323,35 @@
     <div class="listener-count" id="listenerInfo"></div>
   </div>
 
+  <!-- 発言中モード（自分） -->
+  <div class="speaking-mode" id="speakingMode">
+    <div class="mic-icon">🎤</div>
+    <div class="speaking-text">発言中です（全員に聞こえています）</div>
+  </div>
+
+  <!-- 他の人が発言中 -->
+  <div class="other-speaking" id="otherSpeaking">
+    🎤 <span id="otherSpeakerName"></span> が発言中
+  </div>
+
+  <!-- 挙手ボタン -->
+  <div class="hand-raise-area" id="handRaiseArea">
+    <button class="btn-hand idle" id="btnHand" onclick="toggleHandRaise()">
+      ✋ 挙手する
+    </button>
+  </div>
+
   <div class="volume-control">
     <label>🔊</label>
     <input type="range" id="volume" min="0" max="100" value="80" oninput="setVolume(this.value)">
+  </div>
+
+  <!-- 文字おこしパネル -->
+  <div class="transcript-panel">
+    <h2>📝 文字おこし</h2>
+    <div class="transcript-box" id="transcriptBox">
+      <div class="transcript-empty" id="transcriptEmpty">音声受信後に表示されます</div>
+    </div>
   </div>
 
   <div class="connection-status disconnected" id="connStatus">サーバー未接続</div>
@@ -167,14 +362,48 @@
     document.getElementById('roomInfo').textContent = `ルーム: ${roomId}`;
 
     const SAMPLE_RATE = 16000;
+    const BUFFER_SIZE = 4096;
 
+    let userName = '';
     let ws = null;
     let audioContext = null;
     let gainNode = null;
     let isAudioUnlocked = false;
     let isReceiving = false;
     let nextPlayTime = 0;
+    let isHandRaised = false;
+    let isSpeaking = false;
 
+    // 発言用
+    let speakStream = null;
+    let speakAudioContext = null;
+    let speakProcessor = null;
+    let speakSource = null;
+    let speakRecognition = null;
+
+    // --- ログイン ---
+    const nameInput = document.getElementById('nameInput');
+    nameInput.addEventListener('input', () => {
+      document.getElementById('btnJoin').disabled = nameInput.value.trim().length === 0;
+    });
+    nameInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && nameInput.value.trim().length > 0) {
+        joinWithName();
+      }
+    });
+
+    function joinWithName() {
+      userName = nameInput.value.trim();
+      if (!userName) return;
+
+      document.getElementById('loginOverlay').classList.add('hidden');
+      document.getElementById('userNameDisplay').textContent = `参加名: ${userName}`;
+
+      // 音声有効化オーバーレイを表示
+      document.getElementById('tapOverlay').classList.remove('hidden');
+    }
+
+    // --- 音声有効化 ---
     function unlockAudio() {
       audioContext = new (window.AudioContext || window.webkitAudioContext)({
         sampleRate: SAMPLE_RATE,
@@ -183,7 +412,6 @@
       gainNode.connect(audioContext.destination);
       setVolume(document.getElementById('volume').value);
 
-      // iOS Safari用：無音を再生して AudioContext を有効化
       const silent = audioContext.createBuffer(1, 1, SAMPLE_RATE);
       const src = audioContext.createBufferSource();
       src.buffer = silent;
@@ -198,7 +426,6 @@
       nextPlayTime = 0;
       document.getElementById('tapOverlay').classList.add('hidden');
 
-      // まだWebSocket未接続なら接続
       if (!ws) connect();
     }
 
@@ -225,14 +452,14 @@
       source.connect(gainNode);
 
       const now = audioContext.currentTime;
-      // バッファを連続的にスケジュールして途切れを防ぐ
       if (nextPlayTime < now) {
-        nextPlayTime = now + 0.01; // 10msのバッファ
+        nextPlayTime = now + 0.01;
       }
       source.start(nextPlayTime);
       nextPlayTime += audioBuffer.duration;
     }
 
+    // --- 状態表示 ---
     function setStatus(state, text, sub) {
       const card = document.getElementById('statusCard');
       const icon = document.getElementById('statusIcon');
@@ -254,9 +481,173 @@
       }
     }
 
+    // --- 挙手 ---
+    function toggleHandRaise() {
+      if (isSpeaking) return;
+
+      const btn = document.getElementById('btnHand');
+      isHandRaised = !isHandRaised;
+
+      if (isHandRaised) {
+        btn.className = 'btn-hand raised';
+        btn.textContent = '✋ 挙手中（タップで取り消し）';
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: 'hand_raise' }));
+        }
+      } else {
+        btn.className = 'btn-hand idle';
+        btn.textContent = '✋ 挙手する';
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: 'hand_lower' }));
+        }
+      }
+    }
+
+    // --- 発言モード ---
+    async function startSpeaking() {
+      isSpeaking = true;
+      isHandRaised = false;
+
+      const btn = document.getElementById('btnHand');
+      btn.className = 'btn-hand idle';
+      btn.textContent = '✋ 挙手する';
+      btn.style.display = 'none';
+
+      document.getElementById('speakingMode').style.display = 'block';
+
+      try {
+        speakStream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+            sampleRate: SAMPLE_RATE,
+          }
+        });
+
+        speakAudioContext = new (window.AudioContext || window.webkitAudioContext)({
+          sampleRate: SAMPLE_RATE,
+        });
+
+        speakSource = speakAudioContext.createMediaStreamSource(speakStream);
+        speakProcessor = speakAudioContext.createScriptProcessor(BUFFER_SIZE, 1, 1);
+
+        speakProcessor.onaudioprocess = (e) => {
+          if (!isSpeaking || !ws || ws.readyState !== WebSocket.OPEN) return;
+
+          const float32 = e.inputBuffer.getChannelData(0);
+          const int16 = new Int16Array(float32.length);
+          for (let i = 0; i < float32.length; i++) {
+            const s = Math.max(-1, Math.min(1, float32[i]));
+            int16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+          }
+          ws.send(int16.buffer);
+        };
+
+        speakSource.connect(speakProcessor);
+        speakProcessor.connect(speakAudioContext.destination);
+
+        // 文字おこし開始
+        startSpeakRecognition();
+
+      } catch (err) {
+        console.error('マイク取得エラー:', err);
+        stopSpeaking();
+      }
+    }
+
+    function stopSpeaking() {
+      isSpeaking = false;
+
+      stopSpeakRecognition();
+
+      if (speakProcessor) { speakProcessor.disconnect(); speakProcessor = null; }
+      if (speakSource) { speakSource.disconnect(); speakSource = null; }
+      if (speakAudioContext) { speakAudioContext.close(); speakAudioContext = null; }
+      if (speakStream) { speakStream.getTracks().forEach(t => t.stop()); speakStream = null; }
+
+      document.getElementById('speakingMode').style.display = 'none';
+      document.getElementById('btnHand').style.display = 'block';
+    }
+
+    // --- 聴講者の文字おこし（発言中のみ） ---
+    function startSpeakRecognition() {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) return;
+
+      speakRecognition = new SpeechRecognition();
+      speakRecognition.lang = 'ja-JP';
+      speakRecognition.continuous = true;
+      speakRecognition.interimResults = true;
+
+      speakRecognition.onresult = (event) => {
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const result = event.results[i];
+          const text = result[0].transcript;
+          const isFinal = result.isFinal;
+
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: 'transcription', text, isFinal }));
+          }
+        }
+      };
+
+      speakRecognition.onend = () => {
+        if (isSpeaking) speakRecognition.start();
+      };
+
+      speakRecognition.onerror = (event) => {
+        if (event.error === 'no-speech') return;
+        if (isSpeaking && event.error !== 'aborted') {
+          setTimeout(() => {
+            if (isSpeaking) speakRecognition.start();
+          }, 1000);
+        }
+      };
+
+      speakRecognition.start();
+    }
+
+    function stopSpeakRecognition() {
+      if (speakRecognition) {
+        speakRecognition.abort();
+        speakRecognition = null;
+      }
+    }
+
+    // --- 文字おこし表示 ---
+    let currentInterimLine = null;
+
+    function showTranscription(speaker, text, isFinal) {
+      const box = document.getElementById('transcriptBox');
+      const empty = document.getElementById('transcriptEmpty');
+      if (empty) empty.remove();
+
+      if (isFinal) {
+        if (currentInterimLine) {
+          currentInterimLine.remove();
+          currentInterimLine = null;
+        }
+        const div = document.createElement('div');
+        div.className = 'transcript-line';
+        div.innerHTML = `<span class="speaker">${escapeHtml(speaker)}:</span> <span class="text">${escapeHtml(text)}</span>`;
+        box.appendChild(div);
+        box.scrollTop = box.scrollHeight;
+      } else {
+        if (!currentInterimLine) {
+          currentInterimLine = document.createElement('div');
+          currentInterimLine.className = 'transcript-line';
+          box.appendChild(currentInterimLine);
+        }
+        currentInterimLine.innerHTML = `<span class="speaker">${escapeHtml(speaker)}:</span> <span class="interim">${escapeHtml(text)}</span>`;
+        box.scrollTop = box.scrollHeight;
+      }
+    }
+
+    // --- WebSocket接続 ---
     function connect() {
       const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = `${protocol}//${location.host}?role=listener&room=${encodeURIComponent(roomId)}`;
+      const wsUrl = `${protocol}//${location.host}?role=listener&room=${encodeURIComponent(roomId)}&name=${encodeURIComponent(userName)}`;
 
       ws = new WebSocket(wsUrl);
       ws.binaryType = 'arraybuffer';
@@ -268,7 +659,6 @@
 
       ws.onmessage = (event) => {
         if (event.data instanceof ArrayBuffer) {
-          // PCM音声データ受信
           if (!isReceiving) {
             isReceiving = true;
             setStatus('receiving', '受信中', '音声を再生しています');
@@ -300,6 +690,26 @@
                 document.getElementById('listenerInfo').textContent =
                   `現在 ${msg.count} 人が接続中`;
                 break;
+              case 'speak_allowed':
+                startSpeaking();
+                break;
+              case 'speak_revoked':
+                stopSpeaking();
+                break;
+              case 'speaker_changed':
+                if (msg.name && msg.name !== userName) {
+                  document.getElementById('otherSpeakerName').textContent = msg.name;
+                  document.getElementById('otherSpeaking').style.display = 'block';
+                } else {
+                  document.getElementById('otherSpeaking').style.display = 'none';
+                }
+                if (!msg.name && isSpeaking) {
+                  stopSpeaking();
+                }
+                break;
+              case 'transcription':
+                showTranscription(msg.name, msg.text, msg.isFinal);
+                break;
             }
           } catch (e) {}
         }
@@ -309,14 +719,20 @@
         document.getElementById('connStatus').textContent = 'サーバー切断 - 再接続中...';
         document.getElementById('connStatus').className = 'connection-status disconnected';
         isReceiving = false;
-        setTimeout(connect, 3000);
+        ws = null;
+        setTimeout(() => {
+          if (isAudioUnlocked) connect();
+        }, 3000);
       };
 
       ws.onerror = () => {};
     }
 
-    // 音声解除後に接続開始（タップ前はWebSocket接続だけ先に行う）
-    connect();
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
   </script>
 </body>
 </html>

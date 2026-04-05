@@ -97,6 +97,113 @@
       max-width: 400px;
       text-align: center;
     }
+
+    /* 挙手通知パネル */
+    .hand-raise-panel {
+      background: #16213e;
+      border-radius: 16px;
+      padding: 16px;
+      width: 100%;
+      max-width: 400px;
+      margin-bottom: 20px;
+    }
+    .hand-raise-panel h2 {
+      font-size: 1em;
+      margin-bottom: 12px;
+      color: #ffc107;
+    }
+    .hand-raise-list {
+      list-style: none;
+    }
+    .hand-raise-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: #1a1a2e;
+      border-radius: 10px;
+      padding: 10px 14px;
+      margin-bottom: 8px;
+      animation: slideIn 0.3s ease;
+    }
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateX(-20px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+    .hand-raise-item .name {
+      font-size: 1em;
+    }
+    .hand-raise-item .name::before {
+      content: '\270B';
+      margin-right: 8px;
+    }
+    .hand-raise-item button {
+      width: auto;
+      padding: 8px 16px;
+      font-size: 0.85em;
+      border-radius: 8px;
+      margin-bottom: 0;
+    }
+    .btn-allow { background: #4caf50; color: white; }
+    .btn-dismiss { background: #666; color: white; margin-left: 6px; }
+    .no-hands { color: #666; font-size: 0.9em; text-align: center; padding: 8px; }
+
+    /* 発言中表示 */
+    .speaking-banner {
+      background: #4caf50;
+      color: white;
+      border-radius: 10px;
+      padding: 12px;
+      width: 100%;
+      max-width: 400px;
+      text-align: center;
+      margin-bottom: 12px;
+      display: none;
+    }
+    .speaking-banner .speaker-name { font-weight: bold; }
+    .speaking-banner button {
+      background: #c62828;
+      color: white;
+      padding: 8px 20px;
+      margin-top: 8px;
+      width: auto;
+      font-size: 0.9em;
+    }
+
+    /* 文字おこしパネル */
+    .transcript-panel {
+      background: #16213e;
+      border-radius: 16px;
+      padding: 16px;
+      width: 100%;
+      max-width: 400px;
+      margin-bottom: 20px;
+    }
+    .transcript-panel h2 {
+      font-size: 1em;
+      margin-bottom: 12px;
+      color: #53c0f0;
+    }
+    .transcript-box {
+      background: #0d1528;
+      border-radius: 10px;
+      padding: 12px;
+      max-height: 200px;
+      overflow-y: auto;
+      font-size: 0.9em;
+      line-height: 1.6;
+    }
+    .transcript-line { margin-bottom: 4px; }
+    .transcript-line .speaker { color: #e94560; font-weight: bold; }
+    .transcript-line .text { color: #ddd; }
+    .transcript-line .interim { color: #888; font-style: italic; }
+    .transcript-empty { color: #666; text-align: center; }
+
+    /* 聴講者リスト */
+    .listener-list {
+      font-size: 0.85em;
+      color: #aaa;
+      margin-top: 8px;
+    }
   </style>
 </head>
 <body>
@@ -109,11 +216,34 @@
     <div class="status-text" id="statusText">待機中</div>
     <div class="listener-count"><span id="listenerCount">0</span></div>
     <div class="listener-label">人が聴講中</div>
+    <div class="listener-list" id="listenerList"></div>
+  </div>
+
+  <!-- 発言中バナー -->
+  <div class="speaking-banner" id="speakingBanner">
+    <div>🎤 <span class="speaker-name" id="speakerName"></span> が発言中</div>
+    <button onclick="revokeSpeak()">発言を終了させる</button>
+  </div>
+
+  <!-- 挙手通知パネル -->
+  <div class="hand-raise-panel">
+    <h2>✋ 挙手通知</h2>
+    <ul class="hand-raise-list" id="handRaiseList">
+      <li class="no-hands" id="noHands">挙手はありません</li>
+    </ul>
   </div>
 
   <div class="controls">
     <button id="btnStart" onclick="startBroadcast()">配信開始</button>
     <button id="btnStop" onclick="stopBroadcast()" disabled>配信停止</button>
+  </div>
+
+  <!-- 文字おこしパネル -->
+  <div class="transcript-panel">
+    <h2>📝 文字おこし</h2>
+    <div class="transcript-box" id="transcriptBox">
+      <div class="transcript-empty" id="transcriptEmpty">配信開始後に表示されます</div>
+    </div>
   </div>
 
   <div class="connection-status disconnected" id="connStatus">サーバー未接続</div>
@@ -123,7 +253,7 @@
     const roomId = params.get('room') || 'default';
     document.getElementById('roomInfo').textContent = `ルーム: ${roomId}`;
 
-    const SAMPLE_RATE = 16000; // 16kHz（音声に十分・帯域節約）
+    const SAMPLE_RATE = 16000;
     const BUFFER_SIZE = 4096;
 
     let ws = null;
@@ -132,12 +262,15 @@
     let processorNode = null;
     let sourceNode = null;
     let isBroadcasting = false;
+    let recognition = null;
+
+    // 挙手者リスト
+    const handRaisedNames = [];
 
     function connect() {
       const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
       const wsUrl = `${protocol}//${location.host}?role=host&room=${encodeURIComponent(roomId)}`;
       ws = new WebSocket(wsUrl);
-
       ws.binaryType = 'arraybuffer';
 
       ws.onopen = () => {
@@ -146,12 +279,42 @@
       };
 
       ws.onmessage = (event) => {
+        if (event.data instanceof ArrayBuffer) {
+          // 発言中の聴講者からの音声 → スピーカーから再生
+          playReceivedAudio(event.data);
+          return;
+        }
         try {
           const msg = JSON.parse(event.data);
+
           if (msg.type === 'listener_count') {
             document.getElementById('listenerCount').textContent = msg.count;
+            if (msg.names && msg.names.length > 0) {
+              document.getElementById('listenerList').textContent = '参加者: ' + msg.names.join(', ');
+            } else {
+              document.getElementById('listenerList').textContent = '';
+            }
+
           } else if (msg.type === 'error') {
             showError(msg.message);
+
+          } else if (msg.type === 'hand_raised') {
+            addHandRaise(msg.name);
+
+          } else if (msg.type === 'hand_lowered') {
+            removeHandRaise(msg.name);
+
+          } else if (msg.type === 'listener_joined') {
+            // 通知は listener_count で処理
+
+          } else if (msg.type === 'listener_left') {
+            removeHandRaise(msg.name);
+
+          } else if (msg.type === 'speaker_changed') {
+            updateSpeakingBanner(msg.name);
+
+          } else if (msg.type === 'transcription') {
+            showTranscription(msg.name, msg.text, msg.isFinal);
           }
         } catch (e) {}
       };
@@ -165,6 +328,198 @@
       ws.onerror = () => {};
     }
 
+    // --- 聴講者の音声再生 ---
+    let playbackContext = null;
+    let playbackGain = null;
+    let nextPlayTime = 0;
+
+    function ensurePlaybackContext() {
+      if (!playbackContext) {
+        playbackContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: SAMPLE_RATE });
+        playbackGain = playbackContext.createGain();
+        playbackGain.connect(playbackContext.destination);
+      }
+    }
+
+    function playReceivedAudio(int16ArrayBuffer) {
+      ensurePlaybackContext();
+      if (playbackContext.state === 'suspended') playbackContext.resume();
+
+      const int16 = new Int16Array(int16ArrayBuffer);
+      const float32 = new Float32Array(int16.length);
+      for (let i = 0; i < int16.length; i++) {
+        float32[i] = int16[i] / (int16[i] < 0 ? 0x8000 : 0x7FFF);
+      }
+
+      const audioBuffer = playbackContext.createBuffer(1, float32.length, SAMPLE_RATE);
+      audioBuffer.getChannelData(0).set(float32);
+
+      const source = playbackContext.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(playbackGain);
+
+      const now = playbackContext.currentTime;
+      if (nextPlayTime < now) {
+        nextPlayTime = now + 0.01;
+      }
+      source.start(nextPlayTime);
+      nextPlayTime += audioBuffer.duration;
+    }
+
+    // --- 挙手管理 ---
+    function addHandRaise(name) {
+      if (handRaisedNames.includes(name)) return;
+      handRaisedNames.push(name);
+      renderHandRaiseList();
+    }
+
+    function removeHandRaise(name) {
+      const idx = handRaisedNames.indexOf(name);
+      if (idx !== -1) {
+        handRaisedNames.splice(idx, 1);
+        renderHandRaiseList();
+      }
+    }
+
+    function renderHandRaiseList() {
+      const list = document.getElementById('handRaiseList');
+      const noHands = document.getElementById('noHands');
+
+      // 既存のアイテムを削除（noHands以外）
+      const items = list.querySelectorAll('.hand-raise-item');
+      items.forEach(item => item.remove());
+
+      if (handRaisedNames.length === 0) {
+        noHands.style.display = 'block';
+        return;
+      }
+      noHands.style.display = 'none';
+
+      handRaisedNames.forEach(name => {
+        const li = document.createElement('li');
+        li.className = 'hand-raise-item';
+        li.innerHTML = `
+          <span class="name">${escapeHtml(name)}</span>
+          <div>
+            <button class="btn-allow" onclick="allowSpeak('${escapeHtml(name)}')">発言許可</button>
+            <button class="btn-dismiss" onclick="dismissHand('${escapeHtml(name)}')">却下</button>
+          </div>
+        `;
+        list.appendChild(li);
+      });
+    }
+
+    function allowSpeak(name) {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'allow_speak', name }));
+      }
+      removeHandRaise(name);
+    }
+
+    function dismissHand(name) {
+      removeHandRaise(name);
+    }
+
+    function revokeSpeak() {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'revoke_speak' }));
+      }
+    }
+
+    function updateSpeakingBanner(name) {
+      const banner = document.getElementById('speakingBanner');
+      if (name) {
+        document.getElementById('speakerName').textContent = name;
+        banner.style.display = 'block';
+        nextPlayTime = 0;
+      } else {
+        banner.style.display = 'none';
+      }
+    }
+
+    // --- 文字おこし ---
+    let currentInterimLine = null;
+
+    function showTranscription(speaker, text, isFinal) {
+      const box = document.getElementById('transcriptBox');
+      const empty = document.getElementById('transcriptEmpty');
+      if (empty) empty.remove();
+
+      if (isFinal) {
+        // 暫定行があれば削除
+        if (currentInterimLine) {
+          currentInterimLine.remove();
+          currentInterimLine = null;
+        }
+        const div = document.createElement('div');
+        div.className = 'transcript-line';
+        div.innerHTML = `<span class="speaker">${escapeHtml(speaker)}:</span> <span class="text">${escapeHtml(text)}</span>`;
+        box.appendChild(div);
+        box.scrollTop = box.scrollHeight;
+      } else {
+        // 暫定テキスト
+        if (!currentInterimLine) {
+          currentInterimLine = document.createElement('div');
+          currentInterimLine.className = 'transcript-line';
+          box.appendChild(currentInterimLine);
+        }
+        currentInterimLine.innerHTML = `<span class="speaker">${escapeHtml(speaker)}:</span> <span class="interim">${escapeHtml(text)}</span>`;
+        box.scrollTop = box.scrollHeight;
+      }
+    }
+
+    function startSpeechRecognition() {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) {
+        console.warn('Speech Recognition APIがサポートされていません');
+        return;
+      }
+
+      recognition = new SpeechRecognition();
+      recognition.lang = 'ja-JP';
+      recognition.continuous = true;
+      recognition.interimResults = true;
+
+      recognition.onresult = (event) => {
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const result = event.results[i];
+          const text = result[0].transcript;
+          const isFinal = result.isFinal;
+
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: 'transcription', text, isFinal }));
+          }
+        }
+      };
+
+      recognition.onend = () => {
+        // 配信中なら自動再開
+        if (isBroadcasting) {
+          recognition.start();
+        }
+      };
+
+      recognition.onerror = (event) => {
+        if (event.error === 'no-speech') return;
+        console.error('Speech Recognition エラー:', event.error);
+        if (isBroadcasting && event.error !== 'aborted') {
+          setTimeout(() => {
+            if (isBroadcasting) recognition.start();
+          }, 1000);
+        }
+      };
+
+      recognition.start();
+    }
+
+    function stopSpeechRecognition() {
+      if (recognition) {
+        recognition.abort();
+        recognition = null;
+      }
+    }
+
+    // --- 配信制御 ---
     function showError(msg) {
       const el = document.getElementById('errorMsg');
       el.textContent = msg;
@@ -189,13 +544,11 @@
 
         sourceNode = audioContext.createMediaStreamSource(stream);
 
-        // ScriptProcessorNode で生PCMデータを取得して送信
         processorNode = audioContext.createScriptProcessor(BUFFER_SIZE, 1, 1);
         processorNode.onaudioprocess = (e) => {
           if (!isBroadcasting || !ws || ws.readyState !== WebSocket.OPEN) return;
 
           const float32 = e.inputBuffer.getChannelData(0);
-          // Float32 → Int16 に変換（帯域半減）
           const int16 = new Int16Array(float32.length);
           for (let i = 0; i < float32.length; i++) {
             const s = Math.max(-1, Math.min(1, float32[i]));
@@ -218,6 +571,9 @@
         document.getElementById('btnStart').disabled = true;
         document.getElementById('btnStop').disabled = false;
 
+        // 文字おこし開始
+        startSpeechRecognition();
+
       } catch (err) {
         if (err.name === 'NotAllowedError') {
           showError('マイクの使用が許可されていません。ブラウザの設定を確認してください。');
@@ -230,22 +586,12 @@
     function stopBroadcast() {
       isBroadcasting = false;
 
-      if (processorNode) {
-        processorNode.disconnect();
-        processorNode = null;
-      }
-      if (sourceNode) {
-        sourceNode.disconnect();
-        sourceNode = null;
-      }
-      if (audioContext) {
-        audioContext.close();
-        audioContext = null;
-      }
-      if (stream) {
-        stream.getTracks().forEach(t => t.stop());
-        stream = null;
-      }
+      stopSpeechRecognition();
+
+      if (processorNode) { processorNode.disconnect(); processorNode = null; }
+      if (sourceNode) { sourceNode.disconnect(); sourceNode = null; }
+      if (audioContext) { audioContext.close(); audioContext = null; }
+      if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
 
       if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ type: 'stop_broadcast' }));
@@ -255,6 +601,12 @@
       document.getElementById('statusText').textContent = '待機中';
       document.getElementById('btnStart').disabled = false;
       document.getElementById('btnStop').disabled = true;
+    }
+
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
     }
 
     connect();
