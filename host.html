@@ -432,8 +432,18 @@
         document.getElementById('speakerName').textContent = name;
         banner.style.display = 'block';
         nextPlayTime = 0;
+        // 説明者のステータスを「受信中」に変更
+        if (isBroadcasting) {
+          document.getElementById('indicator').className = 'indicator idle';
+          document.getElementById('statusText').textContent = '受信中 - ' + name + 'が発言中';
+        }
       } else {
         banner.style.display = 'none';
+        // 配信中なら「配信中」に戻す
+        if (isBroadcasting) {
+          document.getElementById('indicator').className = 'indicator broadcasting';
+          document.getElementById('statusText').textContent = '配信中';
+        }
       }
     }
 

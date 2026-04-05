@@ -40,6 +40,7 @@
     .status-sub { font-size: 0.9em; color: #aaa; }
     .status-waiting .status-text { color: #ffc107; }
     .status-receiving .status-text { color: #4caf50; }
+    .status-broadcasting .status-text { color: #e94560; }
     .status-disconnected .status-text { color: #f44336; }
 
     .sound-wave {
@@ -469,7 +470,10 @@
       document.getElementById('statusText').textContent = text;
       document.getElementById('statusSub').textContent = sub;
 
-      if (state === 'receiving') {
+      if (state === 'broadcasting') {
+        icon.textContent = '🎙️';
+        wave.classList.remove('hidden');
+      } else if (state === 'receiving') {
         icon.textContent = '🔊';
         wave.classList.remove('hidden');
       } else if (state === 'waiting') {
@@ -514,6 +518,9 @@
       btn.style.display = 'none';
 
       document.getElementById('speakingMode').style.display = 'block';
+
+      // ステータスを「配信中」に変更
+      setStatus('broadcasting', '配信中', 'あなたの音声が全員に配信されています');
 
       try {
         speakStream = await navigator.mediaDevices.getUserMedia({
@@ -568,7 +575,11 @@
 
       document.getElementById('speakingMode').style.display = 'none';
       document.getElementById('btnHand').style.display = 'block';
-    }
+
+      // ステータスを「受信中」に戻す（配信中なら）
+      if (isReceiving) {
+        setStatus('receiving', '受信中', '音声を再生しています');
+      }
 
     // --- 聴講者の文字おこし（発言中のみ） ---
     function startSpeakRecognition() {
