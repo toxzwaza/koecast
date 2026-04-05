@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>音声受信 - 聴講者</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #1a1a2e;
+      color: #eee;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+    }
+    h1 {
+      font-size: 1.4em;
+      margin-bottom: 8px;
+      color: #0f3460;
+    }
+    .room-info {
+      font-size: 0.9em;
+      color: #aaa;
+      margin-bottom: 20px;
+    }
+    .status-card {
+      background: #16213e;
+      border-radius: 16px;
+      padding: 32px 24px;
+      width: 100%;
+      max-width: 400px;
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .icon { font-size: 3em; margin-bottom: 16px; }
+    .status-text { font-size: 1.2em; margin-bottom: 8px; font-weight: bold; }
+    .status-sub { font-size: 0.9em; color: #aaa; }
+    .status-waiting .status-text { color: #ffc107; }
+    .status-receiving .status-text { color: #4caf50; }
+    .status-disconnected .status-text { color: #f44336; }
+
+    .sound-wave {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      height: 40px;
+      margin: 16px 0;
+    }
+    .sound-wave .bar {
+      width: 4px;
+      background: #4caf50;
+      border-radius: 2px;
+      animation: wave 1s ease-in-out infinite;
+    }
+    .sound-wave .bar:nth-child(1) { height: 10px; animation-delay: 0s; }
+    .sound-wave .bar:nth-child(2) { height: 20px; animation-delay: 0.1s; }
+    .sound-wave .bar:nth-child(3) { height: 30px; animation-delay: 0.2s; }
+    .sound-wave .bar:nth-child(4) { height: 20px; animation-delay: 0.3s; }
+    .sound-wave .bar:nth-child(5) { height: 10px; animation-delay: 0.4s; }
+    .sound-wave.hidden { display: none; }
+
+    @keyframes wave {
+      0%, 100% { transform: scaleY(1); }
+      50% { transform: scaleY(2); }
+    }
+
+    .listener-count { font-size: 0.9em; color: #aaa; margin-top: 8px; }
+
+    .tap-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.85);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+    .tap-overlay.hidden { display: none; }
+    .tap-overlay .tap-icon { font-size: 4em; margin-bottom: 20px; }
+    .tap-overlay .tap-text {
+      font-size: 1.3em;
+      font-weight: bold;
+      color: white;
+      margin-bottom: 8px;
+    }
+    .tap-overlay .tap-sub {
+      font-size: 0.9em;
+      color: #aaa;
+    }
+
+    .volume-control {
+      width: 100%;
+      max-width: 400px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 0;
+    }
+    .volume-control label { font-size: 1.2em; }
+    .volume-control input[type="range"] {
+      flex: 1;
+      height: 6px;
+      -webkit-appearance: none;
+      background: #333;
+      border-radius: 3px;
+      outline: none;
+    }
+    .volume-control input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 24px;
+      height: 24px;
+      background: #0f3460;
+      border-radius: 50%;
+      cursor: pointer;
+    }
+
+    .connection-status {
+      font-size: 0.85em;
+      color: #aaa;
+      margin-top: 12px;
+    }
+    .connection-status.connected { color: #4caf50; }
+    .connection-status.disconnected { color: #f44336; }
+  </style>
+</head>
+<body>
+
+  <!-- 音声有効化オーバーレイ（タップ必須） -->
+  <div class="tap-overlay" id="tapOverlay" onclick="unlockAudio()">
+    <div class="tap-icon">🔊</div>
+    <div class="tap-text">画面をタップして開始</div>
+    <div class="tap-sub">音声を再生するにはタップが必要です</div>
+  </div>
+
+  <h1>音声受信（聴講者）</h1>
+  <div class="room-info" id="roomInfo">ルーム: -</div>
+
+  <div class="status-card status-waiting" id="statusCard">
+    <div class="icon" id="statusIcon">🔇</div>
+    <div class="status-text" id="statusText">待機中</div>
+    <div class="status-sub" id="statusSub">説明者の配信を待っています...</div>
+    <div class="sound-wave hidden" id="soundWave">
+      <div class="bar"></div>
+      <div class="bar"></div>
+      <div class="bar"></div>
+      <div class="bar"></div>
+      <div class="bar"></div>
+    </div>
+    <div class="listener-count" id="listenerInfo"></div>
+  </div>
+
+  <div class="volume-control">
+    <label>🔊</label>
+    <input type="range" id="volume" min="0" max="100" value="80" oninput="setVolume(this.value)">
+  </div>
+
+  <div class="connection-status disconnected" id="connStatus">サーバー未接続</div>
+
+  <script>
+    const params = new URLSearchParams(location.search);
+    const roomId = params.get('room') || 'default';
+    document.getElementById('roomInfo').textContent = `ルーム: ${roomId}`;
+
+    const SAMPLE_RATE = 16000;
+
+    let ws = null;
+    let audioContext = null;
+    let gainNode = null;
+    let isAudioUnlocked = false;
+    let isReceiving = false;
+    let nextPlayTime = 0;
+
+    function unlockAudio() {
+      audioContext = new (window.AudioContext || window.webkitAudioContext)({
+        sampleRate: SAMPLE_RATE,
+      });
+      gainNode = audioContext.createGain();
+      gainNode.connect(audioContext.destination);
+      setVolume(document.getElementById('volume').value);
+
+      // iOS Safari用：無音を再生して AudioContext を有効化
+      const silent = audioContext.createBuffer(1, 1, SAMPLE_RATE);
+      const src = audioContext.createBufferSource();
+      src.buffer = silent;
+      src.connect(audioContext.destination);
+      src.start();
+
+      if (audioContext.state === 'suspended') {
+        audioContext.resume();
+      }
+
+      isAudioUnlocked = true;
+      nextPlayTime = 0;
+      document.getElementById('tapOverlay').classList.add('hidden');
+
+      // まだWebSocket未接続なら接続
+      if (!ws) connect();
+    }
+
+    function setVolume(val) {
+      if (gainNode) {
+        gainNode.gain.value = val / 100;
+      }
+    }
+
+    function playPCMChunk(int16ArrayBuffer) {
+      if (!audioContext || audioContext.state === 'suspended') return;
+
+      const int16 = new Int16Array(int16ArrayBuffer);
+      const float32 = new Float32Array(int16.length);
+      for (let i = 0; i < int16.length; i++) {
+        float32[i] = int16[i] / (int16[i] < 0 ? 0x8000 : 0x7FFF);
+      }
+
+      const audioBuffer = audioContext.createBuffer(1, float32.length, SAMPLE_RATE);
+      audioBuffer.getChannelData(0).set(float32);
+
+      const source = audioContext.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(gainNode);
+
+      const now = audioContext.currentTime;
+      // バッファを連続的にスケジュールして途切れを防ぐ
+      if (nextPlayTime < now) {
+        nextPlayTime = now + 0.01; // 10msのバッファ
+      }
+      source.start(nextPlayTime);
+      nextPlayTime += audioBuffer.duration;
+    }
+
+    function setStatus(state, text, sub) {
+      const card = document.getElementById('statusCard');
+      const icon = document.getElementById('statusIcon');
+      const wave = document.getElementById('soundWave');
+
+      card.className = `status-card status-${state}`;
+      document.getElementById('statusText').textContent = text;
+      document.getElementById('statusSub').textContent = sub;
+
+      if (state === 'receiving') {
+        icon.textContent = '🔊';
+        wave.classList.remove('hidden');
+      } else if (state === 'waiting') {
+        icon.textContent = '🔇';
+        wave.classList.add('hidden');
+      } else {
+        icon.textContent = '❌';
+        wave.classList.add('hidden');
+      }
+    }
+
+    function connect() {
+      const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${protocol}//${location.host}?role=listener&room=${encodeURIComponent(roomId)}`;
+
+      ws = new WebSocket(wsUrl);
+      ws.binaryType = 'arraybuffer';
+
+      ws.onopen = () => {
+        document.getElementById('connStatus').textContent = 'サーバー接続済み';
+        document.getElementById('connStatus').className = 'connection-status connected';
+      };
+
+      ws.onmessage = (event) => {
+        if (event.data instanceof ArrayBuffer) {
+          // PCM音声データ受信
+          if (!isReceiving) {
+            isReceiving = true;
+            setStatus('receiving', '受信中', '音声を再生しています');
+          }
+          playPCMChunk(event.data);
+        } else {
+          try {
+            const msg = JSON.parse(event.data);
+            switch (msg.type) {
+              case 'broadcast_started':
+                isReceiving = true;
+                nextPlayTime = 0;
+                setStatus('receiving', '受信中', '音声を再生しています');
+                break;
+              case 'broadcast_stopped':
+                isReceiving = false;
+                nextPlayTime = 0;
+                setStatus('waiting', '待機中', '説明者が配信を停止しました');
+                break;
+              case 'host_connected':
+                setStatus('waiting', '待機中', '説明者が接続しました。配信開始を待っています...');
+                break;
+              case 'host_disconnected':
+                isReceiving = false;
+                nextPlayTime = 0;
+                setStatus('disconnected', '切断', '説明者が切断しました');
+                break;
+              case 'listener_count':
+                document.getElementById('listenerInfo').textContent =
+                  `現在 ${msg.count} 人が接続中`;
+                break;
+            }
+          } catch (e) {}
+        }
+      };
+
+      ws.onclose = () => {
+        document.getElementById('connStatus').textContent = 'サーバー切断 - 再接続中...';
+        document.getElementById('connStatus').className = 'connection-status disconnected';
+        isReceiving = false;
+        setTimeout(connect, 3000);
+      };
+
+      ws.onerror = () => {};
+    }
+
+    // 音声解除後に接続開始（タップ前はWebSocket接続だけ先に行う）
+    connect();
+  </script>
+</body>
+</html>

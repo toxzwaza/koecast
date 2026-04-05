@@ -1,0 +1,13 @@
+{
+  "name": "factory-tour-audio",
+  "version": "1.0.0",
+  "description": "工場見学用リアルタイム音声配信WEBアプリ",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "ws": "^8.16.0"
+  }
+}

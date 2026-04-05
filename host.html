@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>音声配信 - 説明者</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #1a1a2e;
+      color: #eee;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+    }
+    h1 {
+      font-size: 1.4em;
+      margin-bottom: 8px;
+      color: #e94560;
+    }
+    .room-info {
+      font-size: 0.9em;
+      color: #aaa;
+      margin-bottom: 20px;
+    }
+    .status-card {
+      background: #16213e;
+      border-radius: 16px;
+      padding: 24px;
+      width: 100%;
+      max-width: 400px;
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .indicator {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      margin: 0 auto 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2em;
+      transition: all 0.3s;
+    }
+    .indicator.idle { background: #333; }
+    .indicator.broadcasting {
+      background: #e94560;
+      animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(233, 69, 96, 0.6); }
+      50% { box-shadow: 0 0 0 20px rgba(233, 69, 96, 0); }
+    }
+    .status-text { font-size: 1.1em; margin-bottom: 8px; }
+    .listener-count {
+      font-size: 2.5em;
+      font-weight: bold;
+    }
+    .listener-count span { color: #e94560; }
+    .listener-label { font-size: 0.85em; color: #aaa; }
+    .controls { width: 100%; max-width: 400px; }
+    button {
+      width: 100%;
+      padding: 16px;
+      border: none;
+      border-radius: 12px;
+      font-size: 1.1em;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-bottom: 10px;
+    }
+    button:active { transform: scale(0.98); }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+    #btnStart { background: #e94560; color: white; }
+    #btnStop { background: #555; color: white; }
+    .connection-status {
+      font-size: 0.85em;
+      color: #aaa;
+      margin-top: 12px;
+      text-align: center;
+    }
+    .connection-status.connected { color: #4caf50; }
+    .connection-status.disconnected { color: #f44336; }
+    .error-msg {
+      background: #f44336;
+      color: white;
+      padding: 12px;
+      border-radius: 8px;
+      margin-bottom: 12px;
+      display: none;
+      width: 100%;
+      max-width: 400px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <h1>音声配信（説明者）</h1>
+  <div class="room-info" id="roomInfo">ルーム: -</div>
+  <div class="error-msg" id="errorMsg"></div>
+
+  <div class="status-card">
+    <div class="indicator idle" id="indicator">🎙️</div>
+    <div class="status-text" id="statusText">待機中</div>
+    <div class="listener-count"><span id="listenerCount">0</span></div>
+    <div class="listener-label">人が聴講中</div>
+  </div>
+
+  <div class="controls">
+    <button id="btnStart" onclick="startBroadcast()">配信開始</button>
+    <button id="btnStop" onclick="stopBroadcast()" disabled>配信停止</button>
+  </div>
+
+  <div class="connection-status disconnected" id="connStatus">サーバー未接続</div>
+
+  <script>
+    const params = new URLSearchParams(location.search);
+    const roomId = params.get('room') || 'default';
+    document.getElementById('roomInfo').textContent = `ルーム: ${roomId}`;
+
+    const SAMPLE_RATE = 16000; // 16kHz（音声に十分・帯域節約）
+    const BUFFER_SIZE = 4096;
+
+    let ws = null;
+    let audioContext = null;
+    let stream = null;
+    let processorNode = null;
+    let sourceNode = null;
+    let isBroadcasting = false;
+
+    function connect() {
+      const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${protocol}//${location.host}?role=host&room=${encodeURIComponent(roomId)}`;
+      ws = new WebSocket(wsUrl);
+
+      ws.binaryType = 'arraybuffer';
+
+      ws.onopen = () => {
+        document.getElementById('connStatus').textContent = 'サーバー接続済み';
+        document.getElementById('connStatus').className = 'connection-status connected';
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+          if (msg.type === 'listener_count') {
+            document.getElementById('listenerCount').textContent = msg.count;
+          } else if (msg.type === 'error') {
+            showError(msg.message);
+          }
+        } catch (e) {}
+      };
+
+      ws.onclose = () => {
+        document.getElementById('connStatus').textContent = 'サーバー切断 - 再接続中...';
+        document.getElementById('connStatus').className = 'connection-status disconnected';
+        setTimeout(connect, 3000);
+      };
+
+      ws.onerror = () => {};
+    }
+
+    function showError(msg) {
+      const el = document.getElementById('errorMsg');
+      el.textContent = msg;
+      el.style.display = 'block';
+      setTimeout(() => { el.style.display = 'none'; }, 5000);
+    }
+
+    async function startBroadcast() {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+            sampleRate: SAMPLE_RATE,
+          }
+        });
+
+        audioContext = new (window.AudioContext || window.webkitAudioContext)({
+          sampleRate: SAMPLE_RATE,
+        });
+
+        sourceNode = audioContext.createMediaStreamSource(stream);
+
+        // ScriptProcessorNode で生PCMデータを取得して送信
+        processorNode = audioContext.createScriptProcessor(BUFFER_SIZE, 1, 1);
+        processorNode.onaudioprocess = (e) => {
+          if (!isBroadcasting || !ws || ws.readyState !== WebSocket.OPEN) return;
+
+          const float32 = e.inputBuffer.getChannelData(0);
+          // Float32 → Int16 に変換（帯域半減）
+          const int16 = new Int16Array(float32.length);
+          for (let i = 0; i < float32.length; i++) {
+            const s = Math.max(-1, Math.min(1, float32[i]));
+            int16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+          }
+          ws.send(int16.buffer);
+        };
+
+        sourceNode.connect(processorNode);
+        processorNode.connect(audioContext.destination);
+
+        isBroadcasting = true;
+
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: 'start_broadcast', sampleRate: SAMPLE_RATE }));
+        }
+
+        document.getElementById('indicator').className = 'indicator broadcasting';
+        document.getElementById('statusText').textContent = '配信中';
+        document.getElementById('btnStart').disabled = true;
+        document.getElementById('btnStop').disabled = false;
+
+      } catch (err) {
+        if (err.name === 'NotAllowedError') {
+          showError('マイクの使用が許可されていません。ブラウザの設定を確認してください。');
+        } else {
+          showError(`マイク取得エラー: ${err.message}`);
+        }
+      }
+    }
+
+    function stopBroadcast() {
+      isBroadcasting = false;
+
+      if (processorNode) {
+        processorNode.disconnect();
+        processorNode = null;
+      }
+      if (sourceNode) {
+        sourceNode.disconnect();
+        sourceNode = null;
+      }
+      if (audioContext) {
+        audioContext.close();
+        audioContext = null;
+      }
+      if (stream) {
+        stream.getTracks().forEach(t => t.stop());
+        stream = null;
+      }
+
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'stop_broadcast' }));
+      }
+
+      document.getElementById('indicator').className = 'indicator idle';
+      document.getElementById('statusText').textContent = '待機中';
+      document.getElementById('btnStart').disabled = false;
+      document.getElementById('btnStop').disabled = true;
+    }
+
+    connect();
+  </script>
+</body>
+</html>
