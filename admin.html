@@ -4,284 +4,140 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>KoeCast 管理画面</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: { DEFAULT: '#6366f1', light: '#818cf8', dark: '#4f46e5' },
+            surface: { DEFAULT: '#0f172a', card: '#1e293b', input: '#0f172a' },
+            accent: { red: '#ef4444', green: '#22c55e', yellow: '#eab308', blue: '#38bdf8' },
+          }
+        }
+      }
+    }
+  </script>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: #1a1a2e;
-      color: #eee;
-      min-height: 100vh;
-    }
-    /* ログイン */
-    .login-overlay {
-      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-      background: #1a1a2e;
-      display: flex; align-items: center; justify-content: center;
-      z-index: 1000;
-    }
+    .login-overlay { position: fixed; inset: 0; background: #0f172a; display: flex; align-items: center; justify-content: center; z-index: 1000; }
     .login-overlay.hidden { display: none; }
-    .login-card {
-      background: #16213e;
-      border-radius: 20px;
-      padding: 32px;
-      width: 90%; max-width: 360px;
-      text-align: center;
-    }
-    .login-card h2 { font-size: 1.3em; margin-bottom: 8px; color: #e94560; }
-    .login-card p { font-size: 0.9em; color: #aaa; margin-bottom: 20px; }
-    .login-card input {
-      width: 100%; padding: 14px;
-      border: 2px solid #333; border-radius: 12px;
-      background: #0d1528; color: #eee;
-      font-size: 1em; text-align: center; outline: none;
-      margin-bottom: 16px;
-    }
-    .login-card input:focus { border-color: #e94560; }
-    .login-card button {
-      width: 100%; padding: 14px; border: none; border-radius: 12px;
-      background: #e94560; color: white;
-      font-size: 1em; font-weight: bold; cursor: pointer;
-    }
-    .login-error { color: #f44336; font-size: 0.85em; margin-bottom: 12px; display: none; }
-
-    /* ヘッダー */
-    .header {
-      background: #16213e;
-      padding: 16px 24px;
-      display: flex; align-items: center; justify-content: space-between;
-      border-bottom: 1px solid #333;
-    }
-    .header h1 { font-size: 1.2em; color: #e94560; }
-    .header .stats { font-size: 0.85em; color: #aaa; }
-
-    /* タブ */
-    .tabs {
-      display: flex; background: #16213e;
-      border-bottom: 1px solid #333;
-      overflow-x: auto;
-    }
-    .tab {
-      padding: 12px 20px; cursor: pointer;
-      color: #aaa; font-size: 0.9em;
-      border-bottom: 3px solid transparent;
-      white-space: nowrap;
-    }
-    .tab.active { color: #e94560; border-bottom-color: #e94560; }
-    .tab:hover { color: #eee; }
-
-    /* コンテンツ */
-    .content { padding: 20px; max-width: 900px; margin: 0 auto; }
     .panel { display: none; }
     .panel.active { display: block; }
+    .tab { border-bottom: 3px solid transparent; }
+    .tab.active { color: #818cf8; border-bottom-color: #818cf8; }
 
-    /* ダッシュボード */
-    .stat-grid {
-      display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-      gap: 12px; margin-bottom: 24px;
-    }
-    .stat-card {
-      background: #16213e; border-radius: 12px;
-      padding: 16px; text-align: center;
-    }
-    .stat-card .value { font-size: 2em; font-weight: bold; color: #e94560; }
-    .stat-card .label { font-size: 0.8em; color: #aaa; margin-top: 4px; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 0.75em; font-weight: 600; }
+    .badge.active { background: #22c55e; color: white; }
+    .badge.inactive { background: #475569; color: white; }
+    .badge.expired { background: #ef4444; color: white; }
 
-    /* ルーム一覧 */
-    .room-list { display: flex; flex-direction: column; gap: 12px; }
-    .room-card {
-      background: #16213e; border-radius: 12px;
-      padding: 16px; cursor: pointer;
-      border: 2px solid transparent;
-      transition: border-color 0.2s;
-    }
-    .room-card:hover { border-color: #333; }
-    .room-card .room-header {
-      display: flex; justify-content: space-between; align-items: center;
-      margin-bottom: 8px;
-    }
-    .room-card .room-name { font-weight: bold; font-size: 1.1em; }
-    .room-card .room-id { font-size: 0.8em; color: #666; }
-    .room-card .room-status { display: flex; gap: 12px; font-size: 0.85em; color: #aaa; }
-    .badge {
-      display: inline-block; padding: 2px 8px; border-radius: 6px;
-      font-size: 0.75em; font-weight: bold;
-    }
-    .badge.active { background: #4caf50; color: white; }
-    .badge.inactive { background: #666; color: white; }
-    .badge.expired { background: #f44336; color: white; }
-
-    /* フォーム */
-    .form-group { margin-bottom: 16px; }
-    .form-group label {
-      display: block; font-size: 0.85em; color: #aaa;
-      margin-bottom: 6px;
-    }
-    .form-group input, .form-group textarea, .form-group select {
-      width: 100%; padding: 10px 12px;
-      border: 2px solid #333; border-radius: 10px;
-      background: #0d1528; color: #eee;
-      font-size: 0.95em; outline: none;
-    }
-    .form-group input:focus, .form-group textarea:focus { border-color: #e94560; }
-    .form-group textarea { resize: vertical; min-height: 60px; }
-    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-
-    /* ボタン */
-    .btn {
-      padding: 10px 20px; border: none; border-radius: 10px;
-      font-size: 0.9em; font-weight: bold; cursor: pointer;
-      transition: opacity 0.2s;
-    }
+    .btn { padding: 10px 20px; border: none; border-radius: 10px; font-size: 0.9em; font-weight: 600; cursor: pointer; transition: all 0.2s; }
     .btn:hover { opacity: 0.85; }
-    .btn-primary { background: #e94560; color: white; }
-    .btn-secondary { background: #333; color: white; }
-    .btn-danger { background: #c62828; color: white; }
-    .btn-success { background: #4caf50; color: white; }
+    .btn-primary { background: linear-gradient(135deg, #6366f1, #818cf8); color: white; }
+    .btn-secondary { background: #334155; color: #cbd5e1; }
+    .btn-danger { background: #dc2626; color: white; }
+    .btn-success { background: #22c55e; color: white; }
     .btn-sm { padding: 6px 14px; font-size: 0.8em; }
     .btn-group { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
 
-    /* ルーム詳細 */
-    .detail-back {
-      font-size: 0.9em; color: #aaa; cursor: pointer;
-      margin-bottom: 16px; display: inline-block;
-    }
-    .detail-back:hover { color: #eee; }
-    .detail-section {
-      background: #16213e; border-radius: 12px;
-      padding: 16px; margin-bottom: 16px;
-    }
-    .detail-section h3 {
-      font-size: 1em; margin-bottom: 12px;
-      color: #53c0f0;
-    }
+    .form-group { margin-bottom: 16px; }
+    .form-group label { display: block; font-size: 0.85em; color: #94a3b8; margin-bottom: 6px; }
+    .form-group input, .form-group textarea { width: 100%; padding: 10px 12px; border: 2px solid #334155; border-radius: 10px; background: #0f172a; color: #e2e8f0; font-size: 0.95em; outline: none; }
+    .form-group input:focus, .form-group textarea:focus { border-color: #6366f1; }
+    .form-group textarea { resize: vertical; min-height: 60px; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 
-    /* QRコード */
-    .qr-container {
-      display: flex; gap: 24px; flex-wrap: wrap;
-    }
-    .qr-item {
-      text-align: center; background: #0d1528;
-      border-radius: 12px; padding: 16px;
-      flex: 1; min-width: 200px;
-    }
-    .qr-item h4 { font-size: 0.9em; margin-bottom: 8px; color: #aaa; }
-    .qr-item img { display: block; margin: 0 auto 8px; border-radius: 8px; }
-    .qr-url {
-      font-size: 0.7em; color: #666;
-      word-break: break-all; margin-top: 8px;
-    }
-    .qr-buttons {
-      display: flex; gap: 6px; justify-content: center;
-      margin-top: 10px;
-    }
-    .qr-buttons button {
-      padding: 6px 12px; border: none; border-radius: 8px;
-      font-size: 0.75em; cursor: pointer;
-      background: #333; color: #ccc;
-    }
-    .qr-buttons button:hover { background: #444; }
-    .copy-ok { color: #4caf50 !important; }
-
-    /* テーブル */
-    .data-table {
-      width: 100%; border-collapse: collapse;
-      font-size: 0.85em;
-    }
-    .data-table th {
-      text-align: left; padding: 8px 12px;
-      color: #aaa; border-bottom: 1px solid #333;
-      font-weight: normal;
-    }
-    .data-table td {
-      padding: 8px 12px;
-      border-bottom: 1px solid #222;
-    }
-    .data-table tr:hover { background: #1a1a2e; }
-    .pagination {
-      display: flex; justify-content: center; gap: 8px;
-      margin-top: 12px;
-    }
-
-    .empty-msg { text-align: center; color: #666; padding: 24px; }
-
-    /* モーダル */
-    .modal-overlay {
-      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(0,0,0,0.7);
-      display: flex; align-items: center; justify-content: center;
-      z-index: 500;
-    }
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 500; }
     .modal-overlay.hidden { display: none; }
-    .modal {
-      background: #16213e; border-radius: 16px;
-      padding: 24px; width: 90%; max-width: 500px;
-      max-height: 80vh; overflow-y: auto;
-    }
-    .modal h2 { font-size: 1.1em; margin-bottom: 16px; color: #e94560; }
+
+    .data-table { width: 100%; border-collapse: collapse; font-size: 0.85em; }
+    .data-table th { text-align: left; padding: 8px 12px; color: #94a3b8; border-bottom: 1px solid #334155; font-weight: normal; }
+    .data-table td { padding: 8px 12px; border-bottom: 1px solid #1e293b; }
+    .data-table tr:hover { background: #0f172a; }
+    .pagination { display: flex; justify-content: center; gap: 8px; margin-top: 12px; }
+
+    .qr-container { display: flex; gap: 24px; flex-wrap: wrap; }
+    .qr-item { text-align: center; background: #0f172a; border-radius: 12px; padding: 16px; flex: 1; min-width: 200px; }
+    .qr-item h4 { font-size: 0.9em; margin-bottom: 8px; color: #94a3b8; }
+    .qr-item img { display: block; margin: 0 auto 8px; border-radius: 8px; }
+    .qr-url { font-size: 0.7em; color: #475569; word-break: break-all; margin-top: 8px; }
+    .qr-buttons { display: flex; gap: 6px; justify-content: center; margin-top: 10px; }
+    .qr-buttons button { padding: 6px 12px; border: none; border-radius: 8px; font-size: 0.75em; cursor: pointer; background: #334155; color: #cbd5e1; }
+    .qr-buttons button:hover { background: #475569; }
+    .copy-ok { color: #22c55e !important; }
   </style>
 </head>
-<body>
+<body class="bg-surface min-h-screen font-sans text-slate-200">
 
   <!-- ログイン -->
   <div class="login-overlay" id="loginOverlay">
-    <div class="login-card">
-      <h2>KoeCast 管理画面</h2>
-      <p>パスワードを入力してください</p>
-      <div class="login-error" id="loginError">パスワードが正しくありません</div>
-      <input type="password" id="passwordInput" placeholder="パスワード" autocomplete="off">
-      <button onclick="doLogin()">ログイン</button>
+    <div class="bg-surface-card rounded-3xl p-8 w-[90%] max-w-[360px] text-center shadow-2xl border border-slate-700/50">
+      <div class="text-3xl mb-3">🔐</div>
+      <h2 class="text-xl font-bold mb-2 text-brand-light">KoeCast 管理画面</h2>
+      <p class="text-sm text-slate-400 mb-5">パスワードを入力してください</p>
+      <div class="text-red-400 text-sm mb-3" id="loginError" style="display:none">パスワードが正しくありません</div>
+      <input type="password" id="passwordInput" placeholder="パスワード" autocomplete="off"
+        class="w-full p-4 border-2 border-slate-600 rounded-xl bg-surface text-slate-200 text-base text-center outline-none focus:border-brand mb-4">
+      <button onclick="doLogin()"
+        class="w-full p-4 border-none rounded-xl bg-gradient-to-r from-brand to-brand-light text-white text-base font-bold cursor-pointer hover:shadow-lg hover:shadow-brand/30 transition-all">
+        ログイン
+      </button>
     </div>
   </div>
 
-  <!-- メイン画面 -->
-  <div class="header">
-    <h1>KoeCast 管理画面</h1>
-    <div class="stats" id="headerStats">-</div>
+  <!-- ヘッダー -->
+  <div class="bg-surface-card px-6 py-4 flex items-center justify-between border-b border-slate-700/50">
+    <div class="flex items-center gap-2">
+      <span class="text-xl">⚙️</span>
+      <h1 class="text-lg font-bold text-brand-light">KoeCast 管理画面</h1>
+    </div>
+    <div class="text-xs text-slate-400" id="headerStats">-</div>
   </div>
 
-  <div class="tabs">
-    <div class="tab active" data-panel="dashboard" onclick="switchTab(this)">ダッシュボード</div>
-    <div class="tab" data-panel="rooms" onclick="switchTab(this)">ルーム管理</div>
-    <div class="tab" data-panel="roomDetail" id="tabDetail" style="display:none" onclick="switchTab(this)">ルーム詳細</div>
+  <!-- タブ -->
+  <div class="flex bg-surface-card border-b border-slate-700/50 overflow-x-auto">
+    <div class="tab active px-5 py-3 cursor-pointer text-slate-400 text-sm whitespace-nowrap hover:text-slate-200 transition-colors" data-panel="dashboard" onclick="switchTab(this)">ダッシュボード</div>
+    <div class="tab px-5 py-3 cursor-pointer text-slate-400 text-sm whitespace-nowrap hover:text-slate-200 transition-colors" data-panel="rooms" onclick="switchTab(this)">ルーム管理</div>
+    <div class="tab px-5 py-3 cursor-pointer text-slate-400 text-sm whitespace-nowrap hover:text-slate-200 transition-colors" data-panel="roomDetail" id="tabDetail" style="display:none" onclick="switchTab(this)">ルーム詳細</div>
   </div>
 
-  <div class="content">
+  <div class="p-5 max-w-[900px] mx-auto">
     <!-- ダッシュボード -->
     <div class="panel active" id="panelDashboard">
-      <div class="stat-grid" id="statGrid">
-        <div class="stat-card"><div class="value" id="statRooms">-</div><div class="label">ルーム数</div></div>
-        <div class="stat-card"><div class="value" id="statHosts">-</div><div class="label">配信中</div></div>
-        <div class="stat-card"><div class="value" id="statListeners">-</div><div class="label">聴講者</div></div>
-        <div class="stat-card"><div class="value" id="statMemory">-</div><div class="label">メモリ (MB)</div></div>
-        <div class="stat-card"><div class="value" id="statUptime">-</div><div class="label">稼働時間</div></div>
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
+        <div class="bg-surface-card rounded-xl p-4 text-center border border-slate-700/50"><div class="text-3xl font-bold text-brand-light" id="statRooms">-</div><div class="text-xs text-slate-400 mt-1">ルーム数</div></div>
+        <div class="bg-surface-card rounded-xl p-4 text-center border border-slate-700/50"><div class="text-3xl font-bold text-accent-red" id="statHosts">-</div><div class="text-xs text-slate-400 mt-1">配信中</div></div>
+        <div class="bg-surface-card rounded-xl p-4 text-center border border-slate-700/50"><div class="text-3xl font-bold text-accent-green" id="statListeners">-</div><div class="text-xs text-slate-400 mt-1">聴講者</div></div>
+        <div class="bg-surface-card rounded-xl p-4 text-center border border-slate-700/50"><div class="text-3xl font-bold text-accent-yellow" id="statMemory">-</div><div class="text-xs text-slate-400 mt-1">メモリ (MB)</div></div>
+        <div class="bg-surface-card rounded-xl p-4 text-center border border-slate-700/50"><div class="text-3xl font-bold text-accent-blue" id="statUptime">-</div><div class="text-xs text-slate-400 mt-1">稼働時間</div></div>
       </div>
-      <h3 style="margin-bottom: 12px; color: #53c0f0;">アクティブルーム</h3>
-      <div id="activeRoomList" class="room-list">
-        <div class="empty-msg">アクティブなルームはありません</div>
+      <h3 class="text-sm font-semibold mb-3 text-accent-blue">アクティブルーム</h3>
+      <div id="activeRoomList" class="flex flex-col gap-3">
+        <div class="text-center text-slate-500 py-6">アクティブなルームはありません</div>
       </div>
     </div>
 
     <!-- ルーム管理 -->
     <div class="panel" id="panelRooms">
-      <div class="btn-group" style="margin-bottom: 16px;">
+      <div class="btn-group mb-4">
         <button class="btn btn-primary" onclick="showCreateRoom()">+ 新規ルーム作成</button>
       </div>
-      <div id="roomList" class="room-list">
-        <div class="empty-msg">ルームがありません</div>
+      <div id="roomList" class="flex flex-col gap-3">
+        <div class="text-center text-slate-500 py-6">ルームがありません</div>
       </div>
     </div>
 
     <!-- ルーム詳細 -->
     <div class="panel" id="panelRoomDetail">
-      <div class="detail-back" onclick="closeDetail()">&larr; ルーム一覧に戻る</div>
+      <div class="text-sm text-slate-400 cursor-pointer mb-4 hover:text-slate-200 transition-colors" onclick="closeDetail()">&larr; ルーム一覧に戻る</div>
       <div id="detailContent"></div>
     </div>
   </div>
 
   <!-- ルーム作成/編集モーダル -->
   <div class="modal-overlay hidden" id="roomModal">
-    <div class="modal">
-      <h2 id="modalTitle">新規ルーム作成</h2>
+    <div class="bg-surface-card rounded-2xl p-6 w-[90%] max-w-[500px] max-h-[80vh] overflow-y-auto border border-slate-700/50 shadow-2xl">
+      <h2 class="text-lg font-bold mb-4 text-brand-light" id="modalTitle">新規ルーム作成</h2>
       <input type="hidden" id="modalMode" value="create">
       <div class="form-group">
         <label>ルームID（英数字・半角、変更不可）</label>
@@ -490,13 +346,13 @@
 
       const expires = r.expires_at ? formatDT(r.expires_at) : '制限なし';
       return `
-        <div class="room-card" onclick="openDetail('${escapeAttr(r.id)}')">
-          <div class="room-header">
-            <span class="room-name">${esc(r.name)}</span>
+        <div class="bg-surface-card rounded-xl p-4 cursor-pointer border-2 border-transparent hover:border-slate-600 transition-all" onclick="openDetail('${escapeAttr(r.id)}')">
+          <div class="flex justify-between items-center mb-2">
+            <span class="font-bold text-base">${esc(r.name)}</span>
             <span class="badge ${badgeClass}">${badgeText}</span>
           </div>
-          <div class="room-id">ID: ${esc(r.id)}</div>
-          <div class="room-status">
+          <div class="text-xs text-slate-500 mb-1">ID: ${esc(r.id)}</div>
+          <div class="flex gap-3 text-xs text-slate-400">
             <span>${r.live_host_connected ? '🎙️ 配信中' : '⏸️ 待機'}</span>
             <span>👥 ${r.live_listeners || 0}人</span>
             <span>〜${expires}</span>
@@ -593,8 +449,8 @@
       let html = `
         <h2 style="margin-bottom: 16px;">${esc(room.name)}</h2>
 
-        <div class="detail-section">
-          <h3>ルーム情報</h3>
+        <div class="bg-surface-card rounded-xl p-4 mb-4 border border-slate-700/50">
+          <h3 class="text-sm font-semibold mb-3 text-accent-blue">ルーム情報</h3>
           <table class="data-table">
             <tr><th style="width:120px">ID</th><td>${esc(room.id)}</td></tr>
             <tr><th>説明</th><td>${esc(room.description || '-')}</td></tr>
@@ -610,8 +466,8 @@
           </div>
         </div>
 
-        <div class="detail-section">
-          <h3>QRコード</h3>
+        <div class="bg-surface-card rounded-xl p-4 mb-4 border border-slate-700/50">
+          <h3 class="text-sm font-semibold mb-3 text-accent-blue">QRコード</h3>
           <div class="qr-container">
             <div class="qr-item">
               <h4>説明者用</h4>
@@ -634,13 +490,13 @@
           </div>
         </div>
 
-        <div class="detail-section">
-          <h3>接続ログ</h3>
+        <div class="bg-surface-card rounded-xl p-4 mb-4 border border-slate-700/50">
+          <h3 class="text-sm font-semibold mb-3 text-accent-blue">接続ログ</h3>
           <div id="logTable"></div>
         </div>
 
-        <div class="detail-section">
-          <h3>文字おこし履歴</h3>
+        <div class="bg-surface-card rounded-xl p-4 mb-4 border border-slate-700/50">
+          <h3 class="text-sm font-semibold mb-3 text-accent-blue">文字おこし履歴</h3>
           <div id="transcriptTable"></div>
         </div>`;
 

@@ -3,250 +3,117 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>音声配信 - 説明者</title>
+  <title>KoeCast - 説明者</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: { DEFAULT: '#6366f1', light: '#818cf8', dark: '#4f46e5' },
+            surface: { DEFAULT: '#0f172a', card: '#1e293b', input: '#0f172a' },
+            accent: { red: '#ef4444', green: '#22c55e', yellow: '#eab308', blue: '#38bdf8' },
+          }
+        }
+      }
+    }
+  </script>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: #1a1a2e;
-      color: #eee;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 20px;
-    }
-    h1 {
-      font-size: 1.4em;
-      margin-bottom: 8px;
-      color: #e94560;
-    }
-    .room-info {
-      font-size: 0.9em;
-      color: #aaa;
-      margin-bottom: 20px;
-    }
-    .status-card {
-      background: #16213e;
-      border-radius: 16px;
-      padding: 24px;
-      width: 100%;
-      max-width: 400px;
-      text-align: center;
-      margin-bottom: 20px;
-    }
-    .indicator {
-      width: 80px;
-      height: 80px;
-      border-radius: 50%;
-      margin: 0 auto 16px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 2em;
-      transition: all 0.3s;
-    }
-    .indicator.idle { background: #333; }
+    .indicator { transition: all 0.3s; }
+    .indicator.idle { background: #334155; }
     .indicator.broadcasting {
-      background: #e94560;
+      background: linear-gradient(135deg, #ef4444, #dc2626);
       animation: pulse 1.5s infinite;
     }
     @keyframes pulse {
-      0%, 100% { box-shadow: 0 0 0 0 rgba(233, 69, 96, 0.6); }
-      50% { box-shadow: 0 0 0 20px rgba(233, 69, 96, 0); }
-    }
-    .status-text { font-size: 1.1em; margin-bottom: 8px; }
-    .listener-count {
-      font-size: 2.5em;
-      font-weight: bold;
-    }
-    .listener-count span { color: #e94560; }
-    .listener-label { font-size: 0.85em; color: #aaa; }
-    .controls { width: 100%; max-width: 400px; }
-    button {
-      width: 100%;
-      padding: 16px;
-      border: none;
-      border-radius: 12px;
-      font-size: 1.1em;
-      font-weight: bold;
-      cursor: pointer;
-      transition: all 0.2s;
-      margin-bottom: 10px;
-    }
-    button:active { transform: scale(0.98); }
-    button:disabled { opacity: 0.4; cursor: not-allowed; }
-    #btnStart { background: #e94560; color: white; }
-    #btnStop { background: #555; color: white; }
-    .connection-status {
-      font-size: 0.85em;
-      color: #aaa;
-      margin-top: 12px;
-      text-align: center;
-    }
-    .connection-status.connected { color: #4caf50; }
-    .connection-status.disconnected { color: #f44336; }
-    .error-msg {
-      background: #f44336;
-      color: white;
-      padding: 12px;
-      border-radius: 8px;
-      margin-bottom: 12px;
-      display: none;
-      width: 100%;
-      max-width: 400px;
-      text-align: center;
-    }
-
-    /* 挙手通知パネル */
-    .hand-raise-panel {
-      background: #16213e;
-      border-radius: 16px;
-      padding: 16px;
-      width: 100%;
-      max-width: 400px;
-      margin-bottom: 20px;
-    }
-    .hand-raise-panel h2 {
-      font-size: 1em;
-      margin-bottom: 12px;
-      color: #ffc107;
-    }
-    .hand-raise-list {
-      list-style: none;
-    }
-    .hand-raise-item {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      background: #1a1a2e;
-      border-radius: 10px;
-      padding: 10px 14px;
-      margin-bottom: 8px;
-      animation: slideIn 0.3s ease;
+      0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.5); }
+      50% { box-shadow: 0 0 0 20px rgba(239, 68, 68, 0); }
     }
     @keyframes slideIn {
       from { opacity: 0; transform: translateX(-20px); }
       to { opacity: 1; transform: translateX(0); }
     }
-    .hand-raise-item .name {
-      font-size: 1em;
-    }
-    .hand-raise-item .name::before {
-      content: '\270B';
-      margin-right: 8px;
-    }
-    .hand-raise-item button {
-      width: auto;
-      padding: 8px 16px;
-      font-size: 0.85em;
-      border-radius: 8px;
-      margin-bottom: 0;
-    }
-    .btn-allow { background: #4caf50; color: white; }
-    .btn-dismiss { background: #666; color: white; margin-left: 6px; }
-    .no-hands { color: #666; font-size: 0.9em; text-align: center; padding: 8px; }
 
-    /* 発言中表示 */
-    .speaking-banner {
-      background: #4caf50;
-      color: white;
-      border-radius: 10px;
-      padding: 12px;
-      width: 100%;
-      max-width: 400px;
-      text-align: center;
-      margin-bottom: 12px;
-      display: none;
-    }
-    .speaking-banner .speaker-name { font-weight: bold; }
-    .speaking-banner button {
-      background: #c62828;
-      color: white;
-      padding: 8px 20px;
-      margin-top: 8px;
-      width: auto;
-      font-size: 0.9em;
-    }
+    .connection-status.connected { color: #22c55e; }
+    .connection-status.disconnected { color: #ef4444; }
 
-    /* 文字おこしパネル */
-    .transcript-panel {
-      background: #16213e;
-      border-radius: 16px;
-      padding: 16px;
-      width: 100%;
-      max-width: 400px;
-      margin-bottom: 20px;
-    }
-    .transcript-panel h2 {
-      font-size: 1em;
-      margin-bottom: 12px;
-      color: #53c0f0;
-    }
-    .transcript-box {
-      background: #0d1528;
-      border-radius: 10px;
-      padding: 12px;
-      max-height: 200px;
-      overflow-y: auto;
-      font-size: 0.9em;
-      line-height: 1.6;
-    }
-    .transcript-line { margin-bottom: 4px; }
-    .transcript-line .speaker { color: #e94560; font-weight: bold; }
-    .transcript-line .text { color: #ddd; }
-    .transcript-line .interim { color: #888; font-style: italic; }
-    .transcript-empty { color: #666; text-align: center; }
+    .hand-raise-item { animation: slideIn 0.3s ease; }
+    .hand-raise-item .name::before { content: '✋'; margin-right: 8px; }
 
-    /* 聴講者リスト */
-    .listener-list {
-      font-size: 0.85em;
-      color: #aaa;
-      margin-top: 8px;
-    }
+    .btn-allow { background: linear-gradient(135deg, #22c55e, #16a34a); color: white; }
+    .btn-dismiss { background: #475569; color: white; margin-left: 6px; }
+
+    .transcript-line { margin-bottom: 6px; }
+    .transcript-line .speaker { color: #818cf8; font-weight: 600; }
+    .transcript-line .text { color: #cbd5e1; }
+    .transcript-line .interim { color: #64748b; font-style: italic; }
+
+    .transcript-box::-webkit-scrollbar { width: 4px; }
+    .transcript-box::-webkit-scrollbar-thumb { background: #334155; border-radius: 2px; }
   </style>
 </head>
-<body>
-  <h1>音声配信（説明者）</h1>
-  <div class="room-info" id="roomInfo">ルーム: -</div>
-  <div class="error-msg" id="errorMsg"></div>
+<body class="bg-surface min-h-screen flex flex-col items-center p-5 font-sans text-slate-200">
 
-  <div class="status-card">
-    <div class="indicator idle" id="indicator">🎙️</div>
-    <div class="status-text" id="statusText">待機中</div>
-    <div class="listener-count"><span id="listenerCount">0</span></div>
-    <div class="listener-label">人が聴講中</div>
-    <div class="listener-list" id="listenerList"></div>
+  <div class="flex items-center gap-2 mb-1">
+    <span class="text-2xl">🎙️</span>
+    <h1 class="text-xl font-bold text-accent-red">KoeCast 説明者</h1>
+  </div>
+  <div class="text-xs text-slate-500 mb-5" id="roomInfo">ルーム: -</div>
+
+  <!-- エラーメッセージ -->
+  <div class="bg-red-600 text-white p-3 rounded-xl mb-3 w-full max-w-[400px] text-center text-sm font-medium" id="errorMsg" style="display:none"></div>
+
+  <!-- ステータスカード -->
+  <div class="bg-surface-card rounded-2xl p-6 w-full max-w-[400px] text-center mb-5 border border-slate-700/50 shadow-xl">
+    <div class="indicator idle w-20 h-20 rounded-full mx-auto mb-4 flex items-center justify-center text-3xl" id="indicator">🎙️</div>
+    <div class="text-lg font-semibold mb-2" id="statusText">待機中</div>
+    <div class="text-4xl font-bold text-accent-red" id="listenerCount">0</div>
+    <div class="text-sm text-slate-400 mt-1">人が聴講中</div>
+    <div class="text-xs text-slate-500 mt-2" id="listenerList"></div>
   </div>
 
   <!-- 発言中バナー -->
-  <div class="speaking-banner" id="speakingBanner">
-    <div>🎤 <span class="speaker-name" id="speakerName"></span> が発言中</div>
-    <button onclick="revokeSpeak()">発言を終了させる</button>
+  <div class="bg-gradient-to-r from-green-600 to-emerald-500 text-white rounded-2xl p-4 w-full max-w-[400px] text-center mb-3" id="speakingBanner" style="display:none">
+    <div class="text-sm">🎤 <span class="font-bold" id="speakerName"></span> が発言中</div>
+    <button onclick="revokeSpeak()"
+      class="mt-2 px-5 py-2 bg-red-700 hover:bg-red-800 text-white rounded-xl text-sm font-bold cursor-pointer border-none transition-colors">
+      発言を終了させる
+    </button>
   </div>
 
   <!-- 挙手通知パネル -->
-  <div class="hand-raise-panel">
-    <h2>✋ 挙手通知</h2>
-    <ul class="hand-raise-list" id="handRaiseList">
-      <li class="no-hands" id="noHands">挙手はありません</li>
+  <div class="bg-surface-card rounded-2xl p-4 w-full max-w-[400px] mb-5 border border-slate-700/50">
+    <h2 class="text-sm font-semibold mb-3 text-accent-yellow flex items-center gap-1.5">
+      <span>✋</span> 挙手通知
+    </h2>
+    <ul class="list-none" id="handRaiseList">
+      <li class="no-hands text-slate-500 text-sm text-center py-2" id="noHands">挙手はありません</li>
     </ul>
   </div>
 
-  <div class="controls">
-    <button id="btnStart" onclick="startBroadcast()">配信開始</button>
-    <button id="btnStop" onclick="stopBroadcast()" disabled>配信停止</button>
+  <!-- 配信コントロール -->
+  <div class="w-full max-w-[400px] space-y-2.5 mb-5">
+    <button id="btnStart" onclick="startBroadcast()"
+      class="w-full p-4 border-none rounded-xl text-lg font-bold cursor-pointer bg-gradient-to-r from-red-500 to-rose-600 text-white hover:shadow-lg hover:shadow-red-500/30 transition-all active:scale-[0.98] disabled:opacity-30 disabled:cursor-not-allowed">
+      配信開始
+    </button>
+    <button id="btnStop" onclick="stopBroadcast()" disabled
+      class="w-full p-4 border-none rounded-xl text-lg font-bold cursor-pointer bg-slate-600 text-white hover:bg-slate-500 transition-all active:scale-[0.98] disabled:opacity-30 disabled:cursor-not-allowed">
+      配信停止
+    </button>
   </div>
 
   <!-- 文字おこしパネル -->
-  <div class="transcript-panel">
-    <h2>📝 文字おこし</h2>
-    <div class="transcript-box" id="transcriptBox">
-      <div class="transcript-empty" id="transcriptEmpty">配信開始後に表示されます</div>
+  <div class="bg-surface-card rounded-2xl p-4 w-full max-w-[400px] mb-5 border border-slate-700/50">
+    <h2 class="text-sm font-semibold mb-3 text-accent-blue flex items-center gap-1.5">
+      <span>📝</span> 文字おこし
+    </h2>
+    <div class="transcript-box bg-surface rounded-xl p-3 max-h-[200px] overflow-y-auto text-sm leading-relaxed" id="transcriptBox">
+      <div class="transcript-empty text-slate-500 text-center" id="transcriptEmpty">配信開始後に表示されます</div>
     </div>
   </div>
 
-  <div class="connection-status disconnected" id="connStatus">サーバー未接続</div>
+  <div class="connection-status disconnected text-xs mt-3" id="connStatus">サーバー未接続</div>
 
   <script>
     const params = new URLSearchParams(location.search);
@@ -255,7 +122,7 @@
 
     const SAMPLE_RATE = 16000;
     const BUFFER_SIZE = 2048;
-    const MAX_PLAYBACK_DELAY = 0.3; // 再生遅延の上限（秒）
+    const MAX_PLAYBACK_DELAY = 0.3;
 
     let ws = null;
     let audioContext = null;
@@ -265,9 +132,8 @@
     let isBroadcasting = false;
     let recognition = null;
     let listenerSpeaking = false;
-    let silentGain = null; // processorNodeの出力を無音にするためのゲイン
+    let silentGain = null;
 
-    // 挙手者リスト
     const handRaisedNames = [];
 
     function connect() {
@@ -278,12 +144,11 @@
 
       ws.onopen = () => {
         document.getElementById('connStatus').textContent = 'サーバー接続済み';
-        document.getElementById('connStatus').className = 'connection-status connected';
+        document.getElementById('connStatus').className = 'connection-status connected text-xs mt-3';
       };
 
       ws.onmessage = (event) => {
         if (event.data instanceof ArrayBuffer) {
-          // 発言中の聴講者からの音声 → スピーカーから再生
           playReceivedAudio(event.data);
           return;
         }
@@ -308,7 +173,7 @@
             removeHandRaise(msg.name);
 
           } else if (msg.type === 'listener_joined') {
-            // 通知は listener_count で処理
+            // listener_count ���処理
 
           } else if (msg.type === 'listener_left') {
             removeHandRaise(msg.name);
@@ -321,16 +186,13 @@
 
           } else if (msg.type === 'room_info') {
             document.getElementById('roomInfo').textContent = `ルーム: ${msg.name}`;
-
-          } else if (msg.type === 'error') {
-            showError(msg.message);
           }
         } catch (e) {}
       };
 
       ws.onclose = () => {
         document.getElementById('connStatus').textContent = 'サーバー切断 - 再接続中...';
-        document.getElementById('connStatus').className = 'connection-status disconnected';
+        document.getElementById('connStatus').className = 'connection-status disconnected text-xs mt-3';
         setTimeout(connect, 3000);
       };
 
@@ -371,7 +233,6 @@
       if (nextPlayTime < now) {
         nextPlayTime = now + 0.005;
       }
-      // 遅延が大きくなりすぎたらリセット
       if (nextPlayTime - now > MAX_PLAYBACK_DELAY) {
         nextPlayTime = now + 0.005;
       }
@@ -398,7 +259,6 @@
       const list = document.getElementById('handRaiseList');
       const noHands = document.getElementById('noHands');
 
-      // 既存のアイテムを削除（noHands以外）
       const items = list.querySelectorAll('.hand-raise-item');
       items.forEach(item => item.remove());
 
@@ -410,12 +270,12 @@
 
       handRaisedNames.forEach(name => {
         const li = document.createElement('li');
-        li.className = 'hand-raise-item';
+        li.className = 'hand-raise-item flex items-center justify-between bg-surface rounded-xl px-4 py-3 mb-2';
         li.innerHTML = `
-          <span class="name">${escapeHtml(name)}</span>
-          <div>
-            <button class="btn-allow" onclick="allowSpeak('${escapeHtml(name)}')">発言許可</button>
-            <button class="btn-dismiss" onclick="dismissHand('${escapeHtml(name)}')">却下</button>
+          <span class="name text-sm">${escapeHtml(name)}</span>
+          <div class="flex">
+            <button class="btn-allow px-4 py-2 text-xs font-bold rounded-lg border-none cursor-pointer" onclick="allowSpeak('${escapeHtml(name)}')">発言許可</button>
+            <button class="btn-dismiss px-4 py-2 text-xs font-bold rounded-lg border-none cursor-pointer" onclick="dismissHand('${escapeHtml(name)}')">却下</button>
           </div>
         `;
         list.appendChild(li);
@@ -446,19 +306,16 @@
         document.getElementById('speakerName').textContent = name;
         banner.style.display = 'block';
         nextPlayTime = 0;
-        // 説明者の音声認識を一時停止（聴講者の声を拾わないように）
         stopSpeechRecognition();
-        // 説明者のステータスを「受信中」に変更
         if (isBroadcasting) {
-          document.getElementById('indicator').className = 'indicator idle';
+          document.getElementById('indicator').className = 'indicator idle w-20 h-20 rounded-full mx-auto mb-4 flex items-center justify-center text-3xl';
           document.getElementById('statusText').textContent = '受信中 - ' + name + 'が発言中';
         }
       } else {
         listenerSpeaking = false;
         banner.style.display = 'none';
-        // 配信中なら「配信中」に戻し、音声認識を再開
         if (isBroadcasting) {
-          document.getElementById('indicator').className = 'indicator broadcasting';
+          document.getElementById('indicator').className = 'indicator broadcasting w-20 h-20 rounded-full mx-auto mb-4 flex items-center justify-center text-3xl';
           document.getElementById('statusText').textContent = '配信中';
           startSpeechRecognition();
         }
@@ -474,7 +331,6 @@
       if (empty) empty.remove();
 
       if (isFinal) {
-        // 暫定行があれば削除
         if (currentInterimLine) {
           currentInterimLine.remove();
           currentInterimLine = null;
@@ -485,7 +341,6 @@
         box.appendChild(div);
         box.scrollTop = box.scrollHeight;
       } else {
-        // 暫定テキスト
         if (!currentInterimLine) {
           currentInterimLine = document.createElement('div');
           currentInterimLine.className = 'transcript-line';
@@ -521,7 +376,6 @@
       };
 
       recognition.onend = () => {
-        // 配信中なら自動再開
         if (isBroadcasting) {
           recognition.start();
         }
@@ -575,7 +429,6 @@
         processorNode = audioContext.createScriptProcessor(BUFFER_SIZE, 1, 1);
         processorNode.onaudioprocess = (e) => {
           if (!isBroadcasting || !ws || ws.readyState !== WebSocket.OPEN) return;
-          // 聴講者が発言中は送信しない
           if (listenerSpeaking) return;
 
           const float32 = e.inputBuffer.getChannelData(0);
@@ -588,7 +441,6 @@
         };
 
         sourceNode.connect(processorNode);
-        // processorNodeの出力を無音にして自分の声が聞こえないようにする
         silentGain = audioContext.createGain();
         silentGain.gain.value = 0;
         processorNode.connect(silentGain);
@@ -600,12 +452,11 @@
           ws.send(JSON.stringify({ type: 'start_broadcast', sampleRate: SAMPLE_RATE }));
         }
 
-        document.getElementById('indicator').className = 'indicator broadcasting';
+        document.getElementById('indicator').className = 'indicator broadcasting w-20 h-20 rounded-full mx-auto mb-4 flex items-center justify-center text-3xl';
         document.getElementById('statusText').textContent = '配信中';
         document.getElementById('btnStart').disabled = true;
         document.getElementById('btnStop').disabled = false;
 
-        // 文字おこし開始
         startSpeechRecognition();
 
       } catch (err) {
@@ -632,7 +483,7 @@
         ws.send(JSON.stringify({ type: 'stop_broadcast' }));
       }
 
-      document.getElementById('indicator').className = 'indicator idle';
+      document.getElementById('indicator').className = 'indicator idle w-20 h-20 rounded-full mx-auto mb-4 flex items-center justify-center text-3xl';
       document.getElementById('statusText').textContent = '待機中';
       document.getElementById('btnStart').disabled = false;
       document.getElementById('btnStop').disabled = true;

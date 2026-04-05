@@ -3,58 +3,66 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>音声受信 - 聴講者</title>
+  <title>KoeCast - 聴講者</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: { DEFAULT: '#6366f1', light: '#818cf8', dark: '#4f46e5' },
+            surface: { DEFAULT: '#0f172a', card: '#1e293b', input: '#0f172a' },
+            accent: { red: '#ef4444', green: '#22c55e', yellow: '#eab308', blue: '#38bdf8' },
+          }
+        }
+      }
+    }
+  </script>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: #1a1a2e;
-      color: #eee;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 20px;
-    }
-    h1 {
-      font-size: 1.4em;
-      margin-bottom: 8px;
-      color: #0f3460;
-    }
-    .room-info {
-      font-size: 0.9em;
-      color: #aaa;
-      margin-bottom: 20px;
-    }
-    .status-card {
-      background: #16213e;
-      border-radius: 16px;
-      padding: 32px 24px;
-      width: 100%;
-      max-width: 400px;
-      text-align: center;
-      margin-bottom: 20px;
-    }
-    .icon { font-size: 3em; margin-bottom: 16px; }
-    .status-text { font-size: 1.2em; margin-bottom: 8px; font-weight: bold; }
-    .status-sub { font-size: 0.9em; color: #aaa; }
-    .status-waiting .status-text { color: #ffc107; }
-    .status-receiving .status-text { color: #4caf50; }
-    .status-broadcasting .status-text { color: #e94560; }
-    .status-disconnected .status-text { color: #f44336; }
+    /* JS が className で直接セットするクラス用 */
+    .status-card { transition: all 0.3s ease; }
+    .status-waiting .status-text-color { color: #eab308; }
+    .status-receiving .status-text-color { color: #22c55e; }
+    .status-broadcasting .status-text-color { color: #ef4444; }
+    .status-disconnected .status-text-color { color: #ef4444; }
 
-    .sound-wave {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 4px;
-      height: 40px;
-      margin: 16px 0;
+    .btn-hand { transition: all 0.2s ease; }
+    .btn-hand.idle {
+      background: linear-gradient(135deg, #eab308, #f59e0b);
+      color: #1e293b; box-shadow: 0 4px 14px rgba(234, 179, 8, 0.3);
     }
+    .btn-hand.raised {
+      background: linear-gradient(135deg, #ef4444, #dc2626);
+      color: white; animation: pulseHand 1.5s infinite;
+    }
+
+    .connection-status.connected { color: #22c55e; }
+    .connection-status.disconnected { color: #ef4444; }
+
+    .transcript-line { margin-bottom: 6px; }
+    .transcript-line .speaker { color: #818cf8; font-weight: 600; }
+    .transcript-line .text { color: #cbd5e1; }
+    .transcript-line .interim { color: #64748b; font-style: italic; }
+
+    /* アニメーション */
+    @keyframes wave {
+      0%, 100% { transform: scaleY(1); }
+      50% { transform: scaleY(2.2); }
+    }
+    @keyframes pulseHand {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.5); }
+      50% { box-shadow: 0 0 0 14px rgba(239, 68, 68, 0); }
+    }
+    @keyframes speakPulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); }
+      50% { box-shadow: 0 0 0 14px rgba(34, 197, 94, 0); }
+    }
+    @keyframes float {
+      0%, 100% { transform: translateY(0px); }
+      50% { transform: translateY(-6px); }
+    }
+
     .sound-wave .bar {
-      width: 4px;
-      background: #4caf50;
-      border-radius: 2px;
       animation: wave 1s ease-in-out infinite;
     }
     .sound-wave .bar:nth-child(1) { height: 10px; animation-delay: 0s; }
@@ -62,361 +70,145 @@
     .sound-wave .bar:nth-child(3) { height: 30px; animation-delay: 0.2s; }
     .sound-wave .bar:nth-child(4) { height: 20px; animation-delay: 0.3s; }
     .sound-wave .bar:nth-child(5) { height: 10px; animation-delay: 0.4s; }
-    .sound-wave.hidden { display: none; }
 
-    @keyframes wave {
-      0%, 100% { transform: scaleY(1); }
-      50% { transform: scaleY(2); }
-    }
+    .speaking-mode { animation: speakPulse 2s infinite; }
 
-    .listener-count { font-size: 0.9em; color: #aaa; margin-top: 8px; }
-
-    /* ログイン画面 */
-    .login-overlay {
-      position: fixed;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(0, 0, 0, 0.92);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      z-index: 200;
-    }
-    .login-overlay.hidden { display: none; }
-    .login-card {
-      background: #16213e;
-      border-radius: 20px;
-      padding: 32px;
-      width: 90%;
-      max-width: 360px;
-      text-align: center;
-    }
-    .login-card h2 {
-      font-size: 1.3em;
-      margin-bottom: 8px;
-      color: #0f3460;
-    }
-    .login-card p {
-      font-size: 0.9em;
-      color: #aaa;
-      margin-bottom: 20px;
-    }
-    .login-card input {
-      width: 100%;
-      padding: 14px;
-      border: 2px solid #333;
-      border-radius: 12px;
-      background: #0d1528;
-      color: #eee;
-      font-size: 1.1em;
-      text-align: center;
-      outline: none;
-      margin-bottom: 16px;
-    }
-    .login-card input:focus {
-      border-color: #0f3460;
-    }
-    .login-card button {
-      width: 100%;
-      padding: 14px;
-      border: none;
-      border-radius: 12px;
-      background: #0f3460;
-      color: white;
-      font-size: 1.1em;
-      font-weight: bold;
-      cursor: pointer;
-    }
-    .login-card button:disabled {
-      opacity: 0.4;
-      cursor: not-allowed;
-    }
-
-    /* 音声有効化オーバーレイ */
-    .tap-overlay {
-      position: fixed;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(0, 0, 0, 0.85);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      z-index: 100;
-    }
-    .tap-overlay.hidden { display: none; }
-    .tap-overlay .tap-icon { font-size: 4em; margin-bottom: 20px; }
-    .tap-overlay .tap-text {
-      font-size: 1.3em;
-      font-weight: bold;
-      color: white;
-      margin-bottom: 8px;
-    }
-    .tap-overlay .tap-sub { font-size: 0.9em; color: #aaa; }
-
-    .volume-control {
-      width: 100%;
-      max-width: 400px;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 12px 0;
-    }
-    .volume-control label { font-size: 1.2em; }
-    .volume-control input[type="range"] {
-      flex: 1;
-      height: 6px;
+    /* スライダー */
+    input[type="range"] { -webkit-appearance: none; }
+    input[type="range"]::-webkit-slider-thumb {
       -webkit-appearance: none;
-      background: #333;
-      border-radius: 3px;
-      outline: none;
-    }
-    .volume-control input[type="range"]::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      width: 24px;
-      height: 24px;
-      background: #0f3460;
-      border-radius: 50%;
-      cursor: pointer;
+      width: 22px; height: 22px;
+      background: linear-gradient(135deg, #6366f1, #818cf8);
+      border-radius: 50%; cursor: pointer;
+      box-shadow: 0 2px 8px rgba(99, 102, 241, 0.4);
     }
 
-    /* 挙手ボタン */
-    .hand-raise-area {
-      width: 100%;
-      max-width: 400px;
-      margin-bottom: 16px;
-    }
-    .btn-hand {
-      width: 100%;
-      padding: 16px;
-      border: none;
-      border-radius: 12px;
-      font-size: 1.1em;
-      font-weight: bold;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-    .btn-hand.idle {
-      background: #ffc107;
-      color: #333;
-    }
-    .btn-hand.raised {
-      background: #e94560;
-      color: white;
-      animation: pulseHand 1.5s infinite;
-    }
-    @keyframes pulseHand {
-      0%, 100% { box-shadow: 0 0 0 0 rgba(233, 69, 96, 0.5); }
-      50% { box-shadow: 0 0 0 12px rgba(233, 69, 96, 0); }
-    }
-
-    /* 発言中モード */
-    .speaking-mode {
-      background: #4caf50;
-      color: white;
-      border-radius: 12px;
-      padding: 16px;
-      width: 100%;
-      max-width: 400px;
-      text-align: center;
-      margin-bottom: 16px;
-      display: none;
-      animation: speakPulse 2s infinite;
-    }
-    @keyframes speakPulse {
-      0%, 100% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.5); }
-      50% { box-shadow: 0 0 0 12px rgba(76, 175, 80, 0); }
-    }
-    .speaking-mode .mic-icon { font-size: 2em; }
-    .speaking-mode .speaking-text { font-size: 1.1em; font-weight: bold; margin-top: 8px; }
-
-    /* 他の人が発言中 */
-    .other-speaking {
-      background: #16213e;
-      border: 2px solid #4caf50;
-      border-radius: 12px;
-      padding: 12px;
-      width: 100%;
-      max-width: 400px;
-      text-align: center;
-      margin-bottom: 16px;
-      display: none;
-      font-size: 0.95em;
-    }
-
-    /* 文字おこしパネル */
-    .transcript-panel {
-      background: #16213e;
-      border-radius: 16px;
-      padding: 16px;
-      width: 100%;
-      max-width: 400px;
-      margin-bottom: 20px;
-    }
-    .transcript-panel h2 {
-      font-size: 1em;
-      margin-bottom: 12px;
-      color: #53c0f0;
-    }
-    .transcript-box {
-      background: #0d1528;
-      border-radius: 10px;
-      padding: 12px;
-      max-height: 200px;
-      overflow-y: auto;
-      font-size: 0.9em;
-      line-height: 1.6;
-    }
-    .transcript-line { margin-bottom: 4px; }
-    .transcript-line .speaker { color: #e94560; font-weight: bold; }
-    .transcript-line .text { color: #ddd; }
-    .transcript-line .interim { color: #888; font-style: italic; }
-    .transcript-empty { color: #666; text-align: center; }
-
-    .connection-status {
-      font-size: 0.85em;
-      color: #aaa;
-      margin-top: 12px;
-    }
-    .connection-status.connected { color: #4caf50; }
-    .connection-status.disconnected { color: #f44336; }
-
-    .user-name-display {
-      font-size: 0.9em;
-      color: #53c0f0;
-      margin-bottom: 12px;
-    }
+    /* スクロールバー */
+    .transcript-box::-webkit-scrollbar { width: 4px; }
+    .transcript-box::-webkit-scrollbar-thumb { background: #334155; border-radius: 2px; }
 
     /* ガイドツアー */
-    .tour-overlay {
-      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(0,0,0,0.75);
-      z-index: 300;
-      display: flex; align-items: center; justify-content: center;
-    }
-    .tour-overlay.hidden { display: none; }
     .tour-spotlight {
       position: absolute;
-      border: 3px solid #53c0f0;
+      border: 3px solid #38bdf8;
       border-radius: 16px;
-      box-shadow: 0 0 0 9999px rgba(0,0,0,0.7);
+      box-shadow: 0 0 0 9999px rgba(0,0,0,0.75);
       transition: all 0.4s ease;
       pointer-events: none;
     }
-    .tour-card {
-      position: absolute;
-      background: #16213e;
-      border-radius: 16px;
-      padding: 20px;
-      width: 85%;
-      max-width: 320px;
-      text-align: center;
-      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
-      z-index: 301;
-    }
-    .tour-card .tour-step { font-size: 0.75em; color: #666; margin-bottom: 8px; }
-    .tour-card .tour-title { font-size: 1.1em; font-weight: bold; color: #53c0f0; margin-bottom: 8px; }
-    .tour-card .tour-desc { font-size: 0.9em; color: #ccc; margin-bottom: 16px; line-height: 1.5; }
-    .tour-card button {
-      padding: 10px 24px; border: none; border-radius: 10px;
-      font-size: 0.95em; font-weight: bold; cursor: pointer;
-      background: #53c0f0; color: #1a1a2e;
-    }
-    .tour-card .tour-skip {
-      background: none; color: #666; font-size: 0.8em;
-      margin-top: 8px; padding: 4px;
-    }
   </style>
 </head>
-<body>
+<body class="bg-surface min-h-screen flex flex-col items-center p-5 font-sans text-slate-200">
 
   <!-- ログイン画面 -->
-  <div class="login-overlay" id="loginOverlay">
-    <div class="login-card">
-      <h2>工場見学</h2>
-      <p>お名前を入力して参加してください</p>
-      <input type="text" id="nameInput" placeholder="お名前" maxlength="20" autocomplete="off">
-      <button id="btnJoin" onclick="joinWithName()" disabled>参加する</button>
+  <div class="login-overlay fixed inset-0 bg-black/95 flex flex-col items-center justify-center z-[200]" id="loginOverlay">
+    <div class="bg-surface-card rounded-3xl p-8 w-[90%] max-w-[360px] text-center shadow-2xl border border-slate-700/50">
+      <div class="text-4xl mb-4" style="animation: float 3s ease-in-out infinite">🎧</div>
+      <h2 class="text-xl font-bold mb-2 text-brand-light">KoeCast</h2>
+      <p class="text-sm text-slate-400 mb-6">お名前を入力して参加してください</p>
+      <input type="text" id="nameInput" placeholder="お名前"  maxlength="20" autocomplete="off"
+        class="w-full p-4 border-2 border-slate-600 rounded-xl bg-surface text-slate-200 text-lg text-center outline-none focus:border-brand mb-4 placeholder-slate-500">
+      <button id="btnJoin" onclick="joinWithName()" disabled
+        class="w-full p-4 border-none rounded-xl bg-gradient-to-r from-brand to-brand-light text-white text-lg font-bold cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed hover:shadow-lg hover:shadow-brand/30 transition-all">
+        参加する
+      </button>
     </div>
   </div>
 
   <!-- 音声有効化オーバーレイ -->
-  <div class="tap-overlay hidden" id="tapOverlay" onclick="unlockAudio()">
-    <div class="tap-icon">🔊</div>
-    <div class="tap-text">画面をタップして音声を有効化</div>
-    <div class="tap-sub">音声を再生するにはタップが必要です</div>
+  <div class="tap-overlay fixed inset-0 bg-black/90 hidden flex-col items-center justify-center z-[100] cursor-pointer" id="tapOverlay" onclick="unlockAudio()"
+    style="display:none">
+    <div class="text-6xl mb-5" style="animation: float 2s ease-in-out infinite">🔊</div>
+    <div class="text-xl font-bold text-white mb-2">タップして音声を有効化</div>
+    <div class="text-sm text-slate-400">音声を再生するにはタップが必要です</div>
   </div>
 
-  <h1>音声受信（聴講者）</h1>
-  <div class="user-name-display" id="userNameDisplay"></div>
-  <div class="room-info" id="roomInfo">ルーム: -</div>
+  <!-- メインコンテンツ -->
+  <div class="flex items-center gap-2 mb-1">
+    <span class="text-2xl">🎧</span>
+    <h1 class="text-xl font-bold text-brand-light">KoeCast</h1>
+  </div>
+  <div class="text-sm text-brand-light/70 mb-1" id="userNameDisplay"></div>
+  <div class="text-xs text-slate-500 mb-5" id="roomInfo">ルーム: -</div>
 
-  <div class="status-card status-waiting" id="statusCard">
-    <div class="icon" id="statusIcon">🔇</div>
-    <div class="status-text" id="statusText">待機中</div>
-    <div class="status-sub" id="statusSub">説明者の配信を待っています...</div>
-    <div class="sound-wave hidden" id="soundWave">
-      <div class="bar"></div>
-      <div class="bar"></div>
-      <div class="bar"></div>
-      <div class="bar"></div>
-      <div class="bar"></div>
+  <!-- ステータスカード -->
+  <div class="status-card status-waiting bg-surface-card rounded-2xl p-8 w-full max-w-[400px] text-center mb-5 border border-slate-700/50 shadow-xl" id="statusCard">
+    <div class="text-5xl mb-4" id="statusIcon">🔇</div>
+    <div class="status-text-color text-xl font-bold mb-2" id="statusText">待機中</div>
+    <div class="text-sm text-slate-400" id="statusSub">説明者の配信を待っています...</div>
+    <div class="sound-wave hidden flex items-center justify-center gap-1 h-10 my-4" id="soundWave">
+      <div class="bar w-1 bg-accent-green rounded-sm"></div>
+      <div class="bar w-1 bg-accent-green rounded-sm"></div>
+      <div class="bar w-1 bg-accent-green rounded-sm"></div>
+      <div class="bar w-1 bg-accent-green rounded-sm"></div>
+      <div class="bar w-1 bg-accent-green rounded-sm"></div>
     </div>
-    <div class="listener-count" id="listenerInfo"></div>
+    <div class="text-sm text-slate-400 mt-2" id="listenerInfo"></div>
   </div>
 
   <!-- 発言中モード（自分） -->
-  <div class="speaking-mode" id="speakingMode">
-    <div class="mic-icon">🎤</div>
-    <div class="speaking-text">発言中です（全員に聞こえています）</div>
+  <div class="speaking-mode bg-gradient-to-r from-green-600 to-emerald-500 text-white rounded-2xl p-5 w-full max-w-[400px] text-center mb-4 hidden" id="speakingMode" style="display:none">
+    <div class="text-3xl">🎤</div>
+    <div class="text-base font-bold mt-2">発言中です</div>
+    <div class="text-sm opacity-80 mt-1">全員に聞こえています</div>
   </div>
 
   <!-- 他の人が発言中 -->
-  <div class="other-speaking" id="otherSpeaking">
-    🎤 <span id="otherSpeakerName"></span> が発言中
+  <div class="other-speaking bg-surface-card border-2 border-accent-green rounded-2xl p-3 w-full max-w-[400px] text-center mb-4 text-sm" id="otherSpeaking" style="display:none">
+    🎤 <span id="otherSpeakerName" class="font-bold text-accent-green"></span> が発言中
   </div>
 
   <!-- 挙手ボタン -->
-  <div class="hand-raise-area" id="handRaiseArea">
-    <button class="btn-hand idle" id="btnHand" onclick="toggleHandRaise()">
+  <div class="w-full max-w-[400px] mb-4" id="handRaiseArea">
+    <button class="btn-hand idle w-full p-4 border-none rounded-xl text-lg font-bold cursor-pointer" id="btnHand" onclick="toggleHandRaise()">
       ✋ 挙手する
     </button>
   </div>
 
-  <div class="volume-control">
-    <label>🔊</label>
-    <input type="range" id="volume" min="0" max="100" value="80" oninput="setVolume(this.value)">
+  <!-- 音量 -->
+  <div class="w-full max-w-[400px] flex items-center gap-3 py-3 px-1">
+    <label class="text-lg">🔊</label>
+    <input type="range" id="volume" min="0" max="100" value="80" oninput="setVolume(this.value)"
+      class="flex-1 h-1.5 bg-slate-700 rounded-full outline-none">
   </div>
 
   <!-- 文字おこしパネル -->
-  <div class="transcript-panel">
-    <h2>📝 文字おこし</h2>
-    <div class="transcript-box" id="transcriptBox">
-      <div class="transcript-empty" id="transcriptEmpty">音声受信後に表示されます</div>
+  <div class="transcript-panel bg-surface-card rounded-2xl p-4 w-full max-w-[400px] mb-5 border border-slate-700/50">
+    <h2 class="text-sm font-semibold mb-3 text-accent-blue flex items-center gap-1.5">
+      <span>📝</span> 文字おこし
+    </h2>
+    <div class="transcript-box bg-surface rounded-xl p-3 max-h-[200px] overflow-y-auto text-sm leading-relaxed" id="transcriptBox">
+      <div class="transcript-empty text-slate-500 text-center" id="transcriptEmpty">音声受信後に表示されます</div>
     </div>
   </div>
 
-  <div class="connection-status disconnected" id="connStatus">サーバー未接続</div>
+  <div class="connection-status disconnected text-xs mt-3" id="connStatus">サーバー未接続</div>
 
   <!-- ガイドツアー -->
-  <div class="tour-overlay hidden" id="tourOverlay">
+  <div class="tour-overlay fixed inset-0 bg-black/75 z-[300] hidden flex items-center justify-center" id="tourOverlay">
     <div class="tour-spotlight" id="tourSpotlight"></div>
-    <div class="tour-card" id="tourCard">
-      <div class="tour-step" id="tourStep"></div>
-      <div class="tour-title" id="tourTitle"></div>
-      <div class="tour-desc" id="tourDesc"></div>
-      <button id="tourNext" onclick="tourNext()">次へ</button><br>
-      <button class="tour-skip" onclick="tourFinish()">スキップ</button>
+    <div class="tour-card absolute bg-surface-card rounded-2xl p-5 w-[85%] max-w-[320px] text-center shadow-2xl border border-slate-700/50 z-[301]" id="tourCard">
+      <div class="tour-step text-xs text-slate-500 mb-2" id="tourStep"></div>
+      <div class="tour-title text-lg font-bold text-accent-blue mb-2" id="tourTitle"></div>
+      <div class="tour-desc text-sm text-slate-300 mb-4 leading-relaxed" id="tourDesc"></div>
+      <button id="tourNext" onclick="tourNext()"
+        class="px-6 py-2.5 border-none rounded-xl text-sm font-bold cursor-pointer bg-gradient-to-r from-brand to-brand-light text-white hover:shadow-lg transition-all">次へ</button><br>
+      <button class="tour-skip bg-transparent border-none text-slate-500 text-xs mt-2 p-1 cursor-pointer hover:text-slate-300" onclick="tourFinish()">スキップ</button>
     </div>
   </div>
 
   <script>
+    // tapOverlayのhidden制御をJSで行うためCSS初期表示をdisplay:noneにする
+    // joinWithName()でhiddenクラスを外す時にdisplay:flexに
+    const _origJoin = null;
+
     const params = new URLSearchParams(location.search);
     const roomId = params.get('room') || 'default';
     document.getElementById('roomInfo').textContent = `ルーム: ${roomId}`;
 
     const SAMPLE_RATE = 16000;
     const BUFFER_SIZE = 2048;
-    const MAX_PLAYBACK_DELAY = 0.3; // 再生遅延の上限（秒）
+    const MAX_PLAYBACK_DELAY = 0.3;
 
     let userName = '';
     let ws = null;
@@ -428,7 +220,6 @@
     let isHandRaised = false;
     let isSpeaking = false;
 
-    // 発言用
     let speakStream = null;
     let speakAudioContext = null;
     let speakProcessor = null;
@@ -451,11 +242,11 @@
       userName = nameInput.value.trim();
       if (!userName) return;
 
-      document.getElementById('loginOverlay').classList.add('hidden');
+      document.getElementById('loginOverlay').style.display = 'none';
       document.getElementById('userNameDisplay').textContent = `参加名: ${userName}`;
 
-      // 音声有効化オーバーレイを表示
-      document.getElementById('tapOverlay').classList.remove('hidden');
+      const tap = document.getElementById('tapOverlay');
+      tap.style.display = 'flex';
     }
 
     // --- 音声有効化 ---
@@ -479,11 +270,10 @@
 
       isAudioUnlocked = true;
       nextPlayTime = 0;
-      document.getElementById('tapOverlay').classList.add('hidden');
+      document.getElementById('tapOverlay').style.display = 'none';
 
       if (!ws) connect();
 
-      // 初回ガイドツアー（接続後少し待ってから開始）
       setTimeout(startTour, 1500);
     }
 
@@ -510,12 +300,10 @@
       source.connect(gainNode);
 
       const now = audioContext.currentTime;
-      // 自分が発言中は再生しない（エコー防止）
       if (isSpeaking) return;
       if (nextPlayTime < now) {
         nextPlayTime = now + 0.005;
       }
-      // 遅延が大きくなりすぎたらリセット
       if (nextPlayTime - now > MAX_PLAYBACK_DELAY) {
         nextPlayTime = now + 0.005;
       }
@@ -529,22 +317,22 @@
       const icon = document.getElementById('statusIcon');
       const wave = document.getElementById('soundWave');
 
-      card.className = `status-card status-${state}`;
+      card.className = `status-card status-${state} bg-surface-card rounded-2xl p-8 w-full max-w-[400px] text-center mb-5 border border-slate-700/50 shadow-xl`;
       document.getElementById('statusText').textContent = text;
       document.getElementById('statusSub').textContent = sub;
 
       if (state === 'broadcasting') {
         icon.textContent = '🎙️';
-        wave.classList.remove('hidden');
+        wave.style.display = 'flex';
       } else if (state === 'receiving') {
         icon.textContent = '🔊';
-        wave.classList.remove('hidden');
+        wave.style.display = 'flex';
       } else if (state === 'waiting') {
         icon.textContent = '🔇';
-        wave.classList.add('hidden');
+        wave.style.display = 'none';
       } else {
         icon.textContent = '❌';
-        wave.classList.add('hidden');
+        wave.style.display = 'none';
       }
     }
 
@@ -556,13 +344,13 @@
       isHandRaised = !isHandRaised;
 
       if (isHandRaised) {
-        btn.className = 'btn-hand raised';
+        btn.className = 'btn-hand raised w-full p-4 border-none rounded-xl text-lg font-bold cursor-pointer';
         btn.textContent = '✋ 挙手中（タップで取り消し）';
         if (ws && ws.readyState === WebSocket.OPEN) {
           ws.send(JSON.stringify({ type: 'hand_raise' }));
         }
       } else {
-        btn.className = 'btn-hand idle';
+        btn.className = 'btn-hand idle w-full p-4 border-none rounded-xl text-lg font-bold cursor-pointer';
         btn.textContent = '✋ 挙手する';
         if (ws && ws.readyState === WebSocket.OPEN) {
           ws.send(JSON.stringify({ type: 'hand_lower' }));
@@ -576,13 +364,12 @@
       isHandRaised = false;
 
       const btn = document.getElementById('btnHand');
-      btn.className = 'btn-hand idle';
+      btn.className = 'btn-hand idle w-full p-4 border-none rounded-xl text-lg font-bold cursor-pointer';
       btn.textContent = '✋ 挙手する';
       btn.style.display = 'none';
 
       document.getElementById('speakingMode').style.display = 'block';
 
-      // ステータスを「配信中」に変更
       setStatus('broadcasting', '配信中', 'あなたの音声が全員に配信されています');
 
       try {
@@ -615,13 +402,11 @@
         };
 
         speakSource.connect(speakProcessor);
-        // 自分の声がスピーカーから出ないよう無音ゲインを経由
         speakSilentGain = speakAudioContext.createGain();
         speakSilentGain.gain.value = 0;
         speakProcessor.connect(speakSilentGain);
         speakSilentGain.connect(speakAudioContext.destination);
 
-        // 文字おこし開始
         startSpeakRecognition();
 
       } catch (err) {
@@ -644,11 +429,9 @@
       document.getElementById('speakingMode').style.display = 'none';
       document.getElementById('btnHand').style.display = 'block';
 
-      // ステータスを「受信中」に戻す（配信中なら）
       if (isReceiving) {
         setStatus('receiving', '受信中', '音声を再生しています');
       }
-      // 再生バッファをリセット
       nextPlayTime = 0;
     }
 
@@ -736,7 +519,7 @@
 
       ws.onopen = () => {
         document.getElementById('connStatus').textContent = 'サーバー接続済み';
-        document.getElementById('connStatus').className = 'connection-status connected';
+        document.getElementById('connStatus').className = 'connection-status connected text-xs mt-3';
       };
 
       ws.onmessage = (event) => {
@@ -805,7 +588,7 @@
 
       ws.onclose = () => {
         document.getElementById('connStatus').textContent = 'サーバー切断 - 再接続中...';
-        document.getElementById('connStatus').className = 'connection-status disconnected';
+        document.getElementById('connStatus').className = 'connection-status disconnected text-xs mt-3';
         isReceiving = false;
         ws = null;
         setTimeout(() => {
@@ -850,7 +633,7 @@
     function startTour() {
       if (localStorage.getItem('koecast_tour_done')) return;
       tourIndex = 0;
-      document.getElementById('tourOverlay').classList.remove('hidden');
+      document.getElementById('tourOverlay').style.display = 'flex';
       showTourStep();
     }
 
@@ -875,7 +658,6 @@
       const isLast = tourIndex === tourSteps.length - 1;
       document.getElementById('tourNext').textContent = isLast ? '完了' : '次へ';
 
-      // カード位置をターゲットの下に配置
       const cardTop = rect.bottom + 16;
       if (cardTop + 200 > window.innerHeight) {
         card.style.top = 'auto';
@@ -899,7 +681,7 @@
 
     function tourFinish() {
       localStorage.setItem('koecast_tour_done', '1');
-      document.getElementById('tourOverlay').classList.add('hidden');
+      document.getElementById('tourOverlay').style.display = 'none';
     }
   </script>
 </body>
